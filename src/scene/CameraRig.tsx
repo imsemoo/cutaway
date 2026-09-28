@@ -72,9 +72,14 @@ export function CameraRig() {
   const aspect = size.width / Math.max(1, size.height)
   const plan = view === 'plan'
   const portrait = aspect < 0.9
+  // Refit only when the aspect crosses a quarter step, not on every pixel of a resize.
+  const aspectStep = Math.round(aspect * 4) / 4
+  const frame = useRef({ aspect, fov, height: size.height })
+  frame.current = { aspect, fov, height: size.height }
 
   useEffect(() => {
     if (!c) return
+    const { aspect, fov, height } = frame.current
     c.minPolarAngle = 0
     c.maxPolarAngle = plan ? 0 : DEG(78)
     c.minAzimuthAngle = -Infinity
@@ -92,7 +97,7 @@ export function CameraRig() {
 
     // A tall screen turns the building so its long side runs up the screen.
     const azimuth = plan ? (portrait ? DEG(-90) : 0) : portrait ? DEG(-68) : DEG(-18)
-    const area = safeArea(size.height)
+    const area = safeArea(height)
 
     const state = useWard.getState()
     let focus: { x: number; z: number } | undefined
@@ -117,8 +122,7 @@ export function CameraRig() {
     void c.moveTo(MID.x, 0, MID.z, animate)
     void c.dollyTo(fit.dist, animate)
     void c.setFocalOffset(fit.offset.x, fit.offset.y, 0, animate)
-    // Keyed on the bucketed aspect, so a resize refits the overview once.
-  }, [c, plan, selection?.type, selection?.id, resetKey, Math.round(aspect * 4) / 4, portrait])
+  }, [c, plan, selection?.type, selection?.id, resetKey, aspectStep, portrait])
 
   return <CameraControls ref={setControls} makeDefault />
 }

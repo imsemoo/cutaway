@@ -34,7 +34,7 @@ export function TopBar() {
       </span>
       <div className="seg" role="radiogroup" aria-label="View">
         {VIEWS.map(({ id, label, icon: Icon }) => (
-          <button key={id} role="radio" aria-checked={view === id} className="seg__btn" onClick={() => setView(id)}>
+          <button key={id} role="radio" aria-checked={view === id} aria-label={label} className="seg__btn" onClick={() => setView(id)}>
             <Icon size={16} strokeWidth={1.75} aria-hidden="true" />
             <span>{label}</span>
           </button>

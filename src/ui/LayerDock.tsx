@@ -21,7 +21,7 @@ export function LayerDock() {
     <div className="dock">
       <div className="seg seg--dock" role="radiogroup" aria-label="Colour the floor by">
         {LAYERS.map(({ id, label, icon: Icon }) => (
-          <button key={id} role="radio" aria-checked={layer === id} className="seg__btn" onClick={() => setLayer(id)}>
+          <button key={id} role="radio" aria-checked={layer === id} aria-label={label} className="seg__btn" onClick={() => setLayer(id)}>
             <Icon size={15} strokeWidth={1.75} aria-hidden="true" />
             <span>{label}</span>
           </button>
