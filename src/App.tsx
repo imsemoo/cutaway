@@ -2,7 +2,7 @@ import { Component, Suspense, lazy, useEffect, type ReactNode } from 'react'
 import type { Day } from './data/types'
 import { ROOM_BY_ID } from './data/floorplan'
 import { ASSET_LABEL, BED_LABEL, bedAt } from './lib/query'
-import { useWard } from './state/store'
+import { syncUrl, useWard } from './state/store'
 import { LayerDock, ViewTools } from './ui/LayerDock'
 import { ListView } from './ui/ListView'
 import { Panel } from './ui/Panel'
@@ -18,6 +18,7 @@ export default function App() {
   useSimulation()
   usePlayback()
   useKeys()
+  useEffect(syncUrl, [])
 
   return (
     <div className="app" data-view={view}>

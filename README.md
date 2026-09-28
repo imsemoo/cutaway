@@ -12,6 +12,7 @@ Everything on screen is simulated. There is no real hospital, patient or reading
 - **Four data layers on the floors:** bed state, temperature, CO₂ and call-light wait time, each with its key.
 - **A 24-hour replay** with play, three speeds and a scrubber marked with every alert.
 - **Pick anything:** click a room or a piece of equipment, or search for it with `/`. The camera flies to it and the side panel shows its day: bed states as a strip, 24-hour temperature and CO₂ charts with limits, call lights, and the equipment in the room.
+- **Every view is a link.** The address bar keeps the view, layer, time and selection, so `?view=plan&layer=air&t=18:00&select=FAM` opens the family lounge at its stuffiest hour.
 - **Alerts that only know the present.** Each alert is worded at the replay minute ("Pressed at 14:21, 9 min without an answer"), so scrubbing never leaks what happens next.
 
 ## How it is built
