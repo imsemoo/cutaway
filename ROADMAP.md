@@ -84,9 +84,9 @@ A `<ward-twin>` web component and a postMessage API, so a host dashboard can sel
 
 ## Status
 
-- [ ] 1.1 Tests and CI: 23 unit tests, 8 browser tests at two sizes, lint, types and a bundle budget, all gating the deploy. Green locally; the first run on GitHub is still to come.
-- [ ] 1.2 Real assets through a glTF pipeline: 8 models, 17,208 triangles, 129 KB, per-instance LOD. The case study does not state these numbers yet.
+- [x] 1.1 Tests and CI: 23 unit tests, 8 browser tests at two sizes, lint, types and a bundle budget, all gating the deploy, green on GitHub.
+- [x] 1.2 Real assets through a glTF pipeline: 8 models, 17,208 triangles, 129 KB, per-instance LOD, stated in the case study.
 - [ ] 1.3 Resilience on real hardware: adaptive quality and context-loss recovery are done and tested; the real-phone test still needs a device
-- [ ] 1.4 A film: 34 seconds, captured on a controlled clock, with a loop in the README. The case study does not open on it yet.
+- [x] 1.4 A film: 34 seconds, captured on a controlled clock, with a loop in the README; the case study opens on it.
 - [ ] Phase 2
 - [ ] Phase 3
