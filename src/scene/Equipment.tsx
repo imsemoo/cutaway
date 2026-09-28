@@ -1,16 +1,17 @@
-import { useFrame, useThree, type ThreeEvent } from '@react-three/fiber'
-import { useLayoutEffect, useMemo, useRef } from 'react'
-import { Color, MathUtils, Matrix4, type InstancedMesh } from 'three'
+import { useFrame, useThree } from '@react-three/fiber'
+import { useLayoutEffect, useRef } from 'react'
+import { MathUtils } from 'three'
 import { ROOM_BY_ID } from '../data/floorplan'
 import type { Asset, AssetKind } from '../data/types'
-import { ASSET_STATUS } from '../lib/colors'
+import { ACCENT, ASSET_TINT } from '../lib/colors'
 import { assetPositions } from '../lib/positions'
 import { assetAt } from '../lib/query'
 import { useWard } from '../state/store'
-import { assetGeometry } from './geometry'
-import { markShadows } from './shadows'
+import { LodInstances, useInstanceData } from './LodInstances'
+import { getMaterial, getProxies, useModels } from './models'
 
 const KINDS: AssetKind[] = ['pump', 'vent', 'chair', 'xray', 'scanner']
+const NEAR = 15
 
 export function Equipment() {
   const day = useWard((s) => s.day)
@@ -24,95 +25,75 @@ export function Equipment() {
   )
 }
 
+/** One kind of equipment: two draw calls (detailed and proxy), coloured by status. */
 function Kind({ kind, list }: { kind: AssetKind; list: Asset[] }) {
-  const ref = useRef<InstancedMesh>(null)
-  const geometry = useMemo(() => assetGeometry(kind), [kind])
+  const models = useModels()
+  const proxies = getProxies()
+  const material = getMaterial()
   const day = useWard((s) => s.day)!
   const t = useWard((s) => s.t)
   const selected = useWard((s) => (s.selection?.type === 'asset' ? s.selection.id : null))
   const select = useWard((s) => s.select)
   const invalidate = useThree((s) => s.invalidate)
-  const current = useRef<{ x: number; z: number }[]>([])
+  const data = useInstanceData(list.length)
   const goal = useRef<{ x: number; z: number }[]>([])
-  const turn = useRef<number[]>([])
+  const placed = useRef(false)
 
   useLayoutEffect(() => {
+    const d = data.current
     const pos = assetPositions(day, t)
     goal.current = list.map((a) => pos.get(a.id)!)
-    // Face the bed in patient rooms; stand square everywhere else.
-    turn.current = list.map((a) => {
-      const room = ROOM_BY_ID[assetAt(a, t).loc]
-      return room.head === 's' ? Math.PI : 0
-    })
-    if (current.current.length !== list.length) current.current = goal.current.map((p) => ({ ...p }))
-    const c = new Color()
     list.forEach((a, i) => {
-      const status = assetAt(a, t).status
-      c.set(ASSET_STATUS[status])
-      if (selected === a.id) c.set('#2946c7')
-      ref.current!.setColorAt(i, c)
+      const at = assetAt(a, t)
+      // Face the bed in patient rooms; stand square everywhere else.
+      d.rot[i] = ROOM_BY_ID[at.loc].head === 's' ? Math.PI : 0
+      d.color[i].set(selected === a.id ? ACCENT : ASSET_TINT[at.status])
+      if (!placed.current) {
+        d.x[i] = goal.current[i].x
+        d.z[i] = goal.current[i].z
+      }
     })
-    if (ref.current!.instanceColor) ref.current!.instanceColor.needsUpdate = true
-    write()
+    placed.current = true
+    d.version++
     invalidate()
-  }, [day, t, selected, list])
-
-  const m = useMemo(() => new Matrix4(), [])
-  function write() {
-    const mesh = ref.current
-    if (!mesh) return
-    current.current.forEach((p, i) => {
-      m.makeRotationY(turn.current[i] ?? 0)
-      m.setPosition(p.x, 0.07, p.z)
-      mesh.setMatrixAt(i, m)
-    })
-    mesh.instanceMatrix.needsUpdate = true
-    mesh.computeBoundingSphere()
-    markShadows()
-  }
+  }, [day, t, selected, list, data, invalidate])
 
   // Equipment glides to its new room instead of teleporting.
   useFrame((_, dt) => {
-    let moving = false
+    const d = data.current
     const k = Math.min(dt, 0.05)
-    current.current.forEach((p, i) => {
-      const g = goal.current[i]
-      if (!g || (p.x === g.x && p.z === g.z)) return
-      p.x = MathUtils.damp(p.x, g.x, 6, k)
-      p.z = MathUtils.damp(p.z, g.z, 6, k)
-      if (Math.abs(p.x - g.x) < 0.01 && Math.abs(p.z - g.z) < 0.01) {
-        p.x = g.x
-        p.z = g.z
+    let moving = false
+    goal.current.forEach((g, i) => {
+      if (d.x[i] === g.x && d.z[i] === g.z) return
+      d.x[i] = MathUtils.damp(d.x[i], g.x, 6, k)
+      d.z[i] = MathUtils.damp(d.z[i], g.z, 6, k)
+      if (Math.abs(d.x[i] - g.x) < 0.01 && Math.abs(d.z[i] - g.z) < 0.01) {
+        d.x[i] = g.x
+        d.z[i] = g.z
       }
       moving = true
     })
     if (moving) {
-      write()
+      d.version++
       invalidate()
     }
-  })
-
-  const onClick = (e: ThreeEvent<MouseEvent>) => {
-    if (e.delta > 5 || e.instanceId === undefined) return
-    e.stopPropagation()
-    select({ type: 'asset', id: list[e.instanceId].id })
-  }
-  const onMove = (e: ThreeEvent<PointerEvent>) => {
-    e.stopPropagation()
-    document.body.style.cursor = 'pointer'
-    if (useWard.getState().hover) useWard.getState().setHover(null)
-  }
+  }, -1)
 
   return (
-    <instancedMesh
-      ref={ref}
-      args={[geometry, undefined, list.length]}
-      castShadow
-      onClick={onClick}
-      onPointerMove={onMove}
-      onPointerOut={() => (document.body.style.cursor = '')}
-    >
-      <meshStandardMaterial roughness={0.55} metalness={0.05} />
-    </instancedMesh>
+    <LodInstances
+      data={data}
+      count={list.length}
+      hi={models?.[kind]}
+      lo={proxies[kind]}
+      material={material}
+      near={NEAR}
+      onPick={(i) => select({ type: 'asset', id: list[i].id })}
+      onHover={(e) => {
+        e.stopPropagation()
+        document.body.style.cursor = 'pointer'
+        if (useWard.getState().hover) useWard.getState().setHover(null)
+      }}
+      onLeave={() => (document.body.style.cursor = '')}
+    />
   )
 }

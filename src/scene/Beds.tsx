@@ -1,79 +1,54 @@
 import { useThree } from '@react-three/fiber'
-import { useLayoutEffect, useMemo, useRef } from 'react'
-import { BoxGeometry, Color, Euler, Matrix4, Quaternion, Vector3, type InstancedMesh } from 'three'
+import { useLayoutEffect } from 'react'
 import { BED_ROOMS, bedPose } from '../data/floorplan'
 import { bedAt } from '../lib/query'
 import { useWard } from '../state/store'
-import { markShadows } from './shadows'
+import { LodInstances, useInstanceData, type InstanceData } from './LodInstances'
+import { getMaterial, getProxies, useModels } from './models'
 
 const n = BED_ROOMS.length
-const ACUITY = ['#a9b8cf', '#a9b8cf', '#8da1c2', '#6f86b3', '#4f6aa3']
+const NEAR = 15
+const ACUITY = ['#b3c1d6', '#b3c1d6', '#93a8c9', '#7189b8', '#4f6aa3']
 
-/** Bed frames always; blanket and pillow only when someone is in the bed. */
+const place = (d: InstanceData) =>
+  BED_ROOMS.forEach((r, i) => {
+    const p = bedPose(r)
+    d.x[i] = p.x
+    d.z[i] = p.z
+    d.rot[i] = p.rot
+  })
+
+/**
+  Every bed with the furniture beside it, and a patient under a blanket in
+  the occupied ones. The blanket's colour is the patient's acuity.
+*/
 export function Beds() {
-  const frame = useRef<InstancedMesh>(null)
-  const blanket = useRef<InstancedMesh>(null)
-  const pillow = useRef<InstancedMesh>(null)
-  const geo = useMemo(
-    () => ({
-      frame: new BoxGeometry(1.0, 0.5, 2.1).translate(0, 0.25, 0),
-      blanket: new BoxGeometry(0.96, 0.14, 1.4).translate(0, 0.57, 0.3),
-      pillow: new BoxGeometry(0.66, 0.12, 0.34).translate(0, 0.56, -0.74),
-    }),
-    [],
-  )
+  const models = useModels()
+  const proxies = getProxies()
+  const material = getMaterial()
   const day = useWard((s) => s.day)
   const t = useWard((s) => s.t)
   const invalidate = useThree((s) => s.invalidate)
+  const beds = useInstanceData(n, place)
+  const kits = useInstanceData(n, place)
+  const people = useInstanceData(n, place)
 
   useLayoutEffect(() => {
-    const m = new Matrix4()
+    const d = people.current
     BED_ROOMS.forEach((r, i) => {
-      const p = bedPose(r)
-      m.makeRotationY(p.rot)
-      m.setPosition(p.x, 0.07, p.z)
-      frame.current!.setMatrixAt(i, m)
-    })
-    frame.current!.instanceMatrix.needsUpdate = true
-  }, [])
-
-  useLayoutEffect(() => {
-    if (!blanket.current || !pillow.current) return
-    const m = new Matrix4()
-    const q = new Quaternion()
-    const pos = new Vector3()
-    const one = new Vector3(1, 1, 1)
-    const zero = new Vector3(0, 0, 0)
-    const c = new Color()
-    BED_ROOMS.forEach((r, i) => {
-      const p = bedPose(r)
       const s = day ? bedAt(day, r.id, t) : undefined
-      const inBed = s?.state === 'occupied'
-      q.setFromEuler(new Euler(0, p.rot, 0))
-      pos.set(p.x, 0.07, p.z)
-      m.compose(pos, q, inBed ? one : zero)
-      blanket.current!.setMatrixAt(i, m)
-      pillow.current!.setMatrixAt(i, m)
-      blanket.current!.setColorAt(i, c.set(ACUITY[s?.acuity ?? 0]))
+      d.show[i] = s?.state === 'occupied' ? 1 : 0
+      d.color[i].set(ACUITY[s?.acuity ?? 0])
     })
-    blanket.current.instanceMatrix.needsUpdate = true
-    pillow.current.instanceMatrix.needsUpdate = true
-    if (blanket.current.instanceColor) blanket.current.instanceColor.needsUpdate = true
-    markShadows()
+    d.version++
     invalidate()
-  }, [day, t, invalidate])
+  }, [day, t, invalidate, people])
 
   return (
     <group>
-      <instancedMesh ref={frame} args={[geo.frame, undefined, n]} castShadow receiveShadow raycast={() => null}>
-        <meshStandardMaterial color="#e4e8ed" roughness={0.7} />
-      </instancedMesh>
-      <instancedMesh ref={blanket} args={[geo.blanket, undefined, n]} castShadow raycast={() => null}>
-        <meshStandardMaterial roughness={0.95} />
-      </instancedMesh>
-      <instancedMesh ref={pillow} args={[geo.pillow, undefined, n]} raycast={() => null}>
-        <meshStandardMaterial color="#ffffff" roughness={0.95} />
-      </instancedMesh>
+      <LodInstances data={beds} count={n} hi={models?.bed} lo={proxies.bed} material={material} near={NEAR} />
+      <LodInstances data={people} count={n} hi={models?.occupant} lo={proxies.occupant} material={material} near={NEAR} />
+      <LodInstances data={kits} count={n} hi={models?.roomKit} lo={null} material={material} near={NEAR} />
     </group>
   )
 }

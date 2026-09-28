@@ -27,6 +27,14 @@ export const ASSET_STATUS: Record<AssetStatus, string> = {
   charging: '#4f79e6',
 }
 
+/** The same statuses as tints on the equipment models: lighter, so a housing still reads as a housing. */
+export const ASSET_TINT: Record<AssetStatus, string> = {
+  'in-use': '#8193b3',
+  available: '#3aae78',
+  'needs-cleaning': '#eaa338',
+  charging: '#6f99ee',
+}
+
 export const NEUTRAL_FLOOR = '#eef1f4'
 export const SUPPORT_FLOOR = '#e2e7ec'
 export const ACCENT = '#2946c7'

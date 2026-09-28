@@ -1,0 +1,39 @@
+{
+  "file": "public/models/ward.glb",
+  "bytes": 132064,
+  "triangles": 17208,
+  "models": {
+    "bed": {
+      "triangles": 3572,
+      "vertices": 2040
+    },
+    "occupant": {
+      "triangles": 1380,
+      "vertices": 707
+    },
+    "roomKit": {
+      "triangles": 2252,
+      "vertices": 1256
+    },
+    "pump": {
+      "triangles": 1904,
+      "vertices": 1420
+    },
+    "vent": {
+      "triangles": 2072,
+      "vertices": 1308
+    },
+    "chair": {
+      "triangles": 2088,
+      "vertices": 1318
+    },
+    "xray": {
+      "triangles": 2648,
+      "vertices": 1536
+    },
+    "scanner": {
+      "triangles": 1292,
+      "vertices": 1070
+    }
+  }
+}
