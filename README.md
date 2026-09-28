@@ -22,7 +22,7 @@ Everything on screen is simulated. There is no real hospital, patient or reading
 - **On-demand rendering.** The canvas draws only when something changes: a camera move, a new minute, a hover. An idle ward costs no GPU time.
 - **Instancing and batching keep draw calls low.** All 38 room floors are one instanced mesh and the pick target; walls, glass and fixtures are merged geometry; each equipment type is one instanced mesh; the 38 room labels are two batched text meshes, one per typeface. A frame is 31 draw calls on desktop with ambient occlusion, and 17 on a phone.
 - **Shadows on demand.** The sun and the building never move, so the shadow map is redrawn only when something that casts a shadow does: walls rising, a bed filling, a pump rolling to another room. Orbiting the camera reuses the last one.
-- **Code-split by weight.** The interface shell paints first (82 kB gzipped); the 3D scene follows (312 kB), and ambient occlusion loads last, on desktop only (97 kB).
+- **Code-split by weight.** The interface shell paints first (83 kB gzipped); the 3D scene follows (309 kB), and ambient occlusion loads last, on desktop only (97 kB).
 - **The camera fits the building by projection:** it projects the floor's corners through a trial camera to find the distance and offset that keep the model clear of the overlays, and turns the building lengthwise on tall screens.
 - Reduced motion turns camera flights and the wall animation into cuts.
 
