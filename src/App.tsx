@@ -2,6 +2,7 @@ import { Component, Suspense, lazy, useEffect, type ReactNode } from 'react'
 import type { Day } from './data/types'
 import { ROOM_BY_ID } from './data/floorplan'
 import { ASSET_LABEL, BED_LABEL, bedAt } from './lib/query'
+import { useQuality } from './state/quality'
 import { syncUrl, useWard } from './state/store'
 import { LayerDock, ViewTools } from './ui/LayerDock'
 import { ListView } from './ui/ListView'
@@ -16,6 +17,9 @@ const Scene = lazy(() => import('./scene/Scene'))
 export default function App() {
   const day = useWard((s) => s.day)
   const view = useWard((s) => s.view)
+  const lost = useQuality((s) => s.lost)
+  const epoch = useQuality((s) => s.epoch)
+  const rebuild = useQuality((s) => s.rebuild)
   useSimulation()
   usePlayback()
   useKeys()
@@ -28,7 +32,7 @@ export default function App() {
       <main className="stage" aria-label="Floor model">
         <WebGLBoundary>
           <Suspense fallback={null}>
-            <Scene />
+            <Scene key={epoch} />
           </Suspense>
         </WebGLBoundary>
         <Tags />
@@ -38,6 +42,14 @@ export default function App() {
         {!day && (
           <div className="loading" role="status">
             Building the simulated day…
+          </div>
+        )}
+        {lost && (
+          <div className="paused" role="status">
+            <p>The 3D view paused: the graphics driver reset. It restarts on its own when the browser allows.</p>
+            <button className="btn" onClick={rebuild}>
+              Restart the 3D view
+            </button>
           </div>
         )}
       </main>

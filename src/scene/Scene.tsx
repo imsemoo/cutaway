@@ -3,18 +3,18 @@ import { Canvas, useFrame, useThree } from '@react-three/fiber'
 import { Suspense, lazy, useLayoutEffect, useMemo, useRef } from 'react'
 import { Object3D, type DirectionalLight } from 'three'
 import { FLOOR } from '../data/floorplan'
+import { START, dprFor, useQuality } from '../state/quality'
 import { Beds } from './Beds'
 import { CameraRig } from './CameraRig'
 import { Equipment } from './Equipment'
 import { Floors } from './Floors'
 import { FrameMeter } from './FrameMeter'
 import { Overlays } from './Overlays'
+import { AdaptiveQuality, ContextWatch } from './Resilience'
 import { Shell } from './Shell'
 import { TagTracker } from './TagTracker'
 import { takeShadowFlag } from './shadows'
 
-// Phones and small screens skip ambient occlusion and render at a lower pixel ratio.
-const lite = typeof window !== 'undefined' && (matchMedia('(pointer: coarse)').matches || window.innerWidth < 760)
 const stats = typeof window !== 'undefined' && new URLSearchParams(location.search).has('stats')
 const Effects = lazy(() => import('./Effects'))
 
@@ -63,12 +63,13 @@ function ShadowOnDemand() {
 }
 
 export default function Scene() {
+  const level = useQuality((s) => s.level)
   return (
     <Canvas
       frameloop="demand"
       flat
       shadows="percentage"
-      dpr={[1, 1.5]}
+      dpr={dprFor(START)}
       camera={{ fov: 35, near: 0.5, far: 600, position: [FLOOR.w / 2, 150, FLOOR.d / 2 + 0.5] }}
       gl={{ antialias: true, powerPreference: 'high-performance' }}
       aria-label="3D model of the ward floor"
@@ -100,11 +101,13 @@ export default function Scene() {
       <Overlays />
       <TagTracker />
       <CameraRig />
-      {!lite && (
+      {level >= 2 && (
         <Suspense fallback={null}>
-          <Effects />
+          <Effects smaa={level >= 3} />
         </Suspense>
       )}
+      <AdaptiveQuality />
+      <ContextWatch />
       {stats && <FrameMeter />}
     </Canvas>
   )

@@ -327,6 +327,24 @@ button {
   text-align: center;
 }
 
+.paused {
+  position: absolute;
+  inset: 0;
+  z-index: 5;
+  display: grid;
+  place-content: center;
+  justify-items: center;
+  gap: 14px;
+  padding: 24px;
+  background: rgb(232 236 240 / 0.92);
+  text-align: center;
+}
+.paused p {
+  margin: 0;
+  max-width: 42ch;
+  color: var(--text-2);
+}
+
 .dock {
   position: absolute;
   left: 16px;

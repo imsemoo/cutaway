@@ -1,5 +1,6 @@
 import { useFrame, useThree } from '@react-three/fiber'
 import { useEffect, useRef } from 'react'
+import { useQuality } from '../state/quality'
 
 /**
   Visit with ?stats for a frame meter: frame rate while the scene is
@@ -31,6 +32,10 @@ export function FrameMeter() {
   const orbit = new URLSearchParams(location.search).get('stats') === 'orbit'
   const controls = useThree((s) => s.controls) as { azimuthAngle: number; rotate: (a: number, p: number, t: boolean) => void } | null
   const invalidate = useThree((s) => s.invalidate)
+  // On-demand rendering waits for a reason to draw; the orbit gives it its first one.
+  useEffect(() => {
+    if (orbit && controls) invalidate()
+  }, [orbit, controls, invalidate])
 
   useFrame((_, delta) => {
     if (orbit && controls) {
@@ -51,7 +56,7 @@ export function FrameMeter() {
       const fps = times.current.length > 5 ? Math.round(1000 / avg) : 0
       const { calls, triangles } = gl.info.render
       const tris = Number.isFinite(triangles) ? `${(triangles / 1000).toFixed(1)}k` : '…'
-      el.current.textContent = `${fps ? `${fps} fps` : 'idle'} · ${calls} draw calls · ${tris} triangles`
+      el.current.textContent = `${fps ? `${fps} fps` : 'idle'} · ${calls} draw calls · ${tris} triangles · quality ${useQuality.getState().level}`
     })
   }, -1)
 
