@@ -6,6 +6,7 @@ import { syncUrl, useWard } from './state/store'
 import { LayerDock, ViewTools } from './ui/LayerDock'
 import { ListView } from './ui/ListView'
 import { Panel } from './ui/Panel'
+import { Tags } from './ui/Tags'
 import { Timeline } from './ui/Timeline'
 import { TopBar } from './ui/TopBar'
 
@@ -30,6 +31,7 @@ export default function App() {
             <Scene />
           </Suspense>
         </WebGLBoundary>
+        <Tags />
         <LayerDock />
         <ViewTools />
         {view === 'list' && <ListView />}

@@ -431,17 +431,27 @@ button {
   font-size: 12px;
 }
 
-/* Floating tags anchored in the 3D scene. */
+/* Floating tags anchored in the 3D scene, positioned by the scene's tag tracker. */
+.tags {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  overflow: hidden;
+}
 .tag {
+  position: absolute;
+  top: 0;
+  left: 0;
   display: grid;
   gap: 1px;
+  margin-top: -6px;
   padding: 5px 9px 6px;
   background: var(--surface);
   border: 1px solid var(--line-2);
   border-radius: 5px;
   box-shadow: var(--shadow);
   white-space: nowrap;
-  translate: 0 -50%;
+  will-change: transform;
 }
 .tag--strong {
   border-color: var(--accent);

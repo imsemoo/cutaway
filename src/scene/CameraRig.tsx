@@ -1,10 +1,10 @@
 import { CameraControls, CameraControlsImpl } from '@react-three/drei'
 import { useThree } from '@react-three/fiber'
-import { useEffect, useRef } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { MathUtils, PerspectiveCamera, Vector3 } from 'three'
 import { FLOOR, ROOM_BY_ID, center } from '../data/floorplan'
 import { useWard } from '../state/store'
-import { assetPositions } from './Equipment'
+import { assetPositions } from '../lib/positions'
 
 const { ACTION } = CameraControlsImpl
 const DEG = MathUtils.degToRad
@@ -61,7 +61,8 @@ function fitFloor(azimuth: number, polar: number, fov: number, aspect: number, a
 }
 
 export function CameraRig() {
-  const ref = useRef<CameraControlsImpl>(null)
+  // The controls arrive through a callback ref, so the first framing waits for them.
+  const [c, setControls] = useState<CameraControlsImpl | null>(null)
   const opened = useRef(false)
   const view = useWard((s) => s.view)
   const selection = useWard((s) => s.selection)
@@ -73,7 +74,6 @@ export function CameraRig() {
   const portrait = aspect < 0.9
 
   useEffect(() => {
-    const c = ref.current
     if (!c) return
     c.minPolarAngle = 0
     c.maxPolarAngle = plan ? 0 : DEG(78)
@@ -85,7 +85,8 @@ export function CameraRig() {
     c.minDistance = 6
     c.maxDistance = 220
     // The first move is the opening shot, down from the plan; the rest are quick.
-    c.smoothTime = opened.current ? 0.35 : 0.9
+    const first = !opened.current
+    c.smoothTime = first ? 0.9 : 0.35
     opened.current = true
     const animate = !reduced
 
@@ -102,7 +103,8 @@ export function CameraRig() {
       const polar = plan ? 0 : DEG(42)
       const dist = (plan ? 30 : 24) * (portrait ? 1.35 : 1)
       const halfH = dist * Math.tan(DEG(fov) / 2)
-      void c.rotateTo(plan ? azimuth : c.azimuthAngle, polar, animate)
+      // Keep the visitor's own angle, except on the opening shot of a shared link.
+      void c.rotateTo(plan || first ? azimuth : c.azimuthAngle, polar, animate)
       void c.moveTo(focus.x, 0, focus.z, animate)
       void c.dollyTo(dist, animate)
       void c.setFocalOffset(0, ((area.top + area.bottom) / 2) * halfH, 0, animate)
@@ -116,7 +118,7 @@ export function CameraRig() {
     void c.dollyTo(fit.dist, animate)
     void c.setFocalOffset(fit.offset.x, fit.offset.y, 0, animate)
     // Keyed on the bucketed aspect, so a resize refits the overview once.
-  }, [plan, selection?.type, selection?.id, resetKey, Math.round(aspect * 4) / 4, portrait])
+  }, [c, plan, selection?.type, selection?.id, resetKey, Math.round(aspect * 4) / 4, portrait])
 
-  return <CameraControls ref={ref} makeDefault />
+  return <CameraControls ref={setControls} makeDefault />
 }

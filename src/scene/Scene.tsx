@@ -10,6 +10,7 @@ import { Floors } from './Floors'
 import { FrameMeter } from './FrameMeter'
 import { Overlays } from './Overlays'
 import { Shell } from './Shell'
+import { TagTracker } from './TagTracker'
 import { takeShadowFlag } from './shadows'
 
 // Phones and small screens skip ambient occlusion and render at a lower pixel ratio.
@@ -97,6 +98,7 @@ export default function Scene() {
       <Beds />
       <Equipment />
       <Overlays />
+      <TagTracker />
       <CameraRig />
       {!lite && (
         <Suspense fallback={null}>
