@@ -34,7 +34,10 @@ const smoothstep = (a: number, b: number, x: number) => {
   return t * t * (3 - 2 * t)
 }
 
-export function simulate(seed = 20260928): Day {
+/** The seed of the day every visitor replays, and the live feed streams. */
+export const SEED = 20260928
+
+export function simulate(seed = SEED): Day {
   const rnd = mulberry32(seed)
   const rand = (a: number, b: number) => a + (b - a) * rnd()
   const randInt = (a: number, b: number) => Math.floor(rand(a, b + 1))

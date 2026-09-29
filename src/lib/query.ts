@@ -1,6 +1,6 @@
 import { BED_ROOMS, ROOM_BY_ID } from '../data/floorplan'
 import type { Asset, AssetSpan, BedSpan, BedState, Day } from '../data/types'
-import { DAY_MIN, SAMPLES, STEP } from '../sim/time'
+import { DAY_MIN, STEP } from '../sim/time'
 
 export const clock = (m: number) => {
   const mm = Math.max(0, Math.min(DAY_MIN, Math.round(m)))
@@ -20,11 +20,12 @@ export function spanAt<T extends { from: number; to: number }>(list: T[] | undef
   return list[list.length - 1]?.to === m ? list[list.length - 1] : undefined
 }
 
-/** Linear read of a 5-minute series at any minute. */
+/** Linear read of a 5-minute series at any minute. A live series ends at its latest reading, which holds until the next. */
 export function sample(series: number[], m: number) {
-  const f = Math.max(0, Math.min(SAMPLES - 1, m / STEP))
+  const last = series.length - 1
+  const f = Math.max(0, Math.min(last, m / STEP))
   const i = Math.floor(f)
-  const j = Math.min(SAMPLES - 1, i + 1)
+  const j = Math.min(last, i + 1)
   return series[i] + (series[j] - series[i]) * (f - i)
 }
 
