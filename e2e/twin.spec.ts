@@ -37,8 +37,12 @@ test('switching layers keeps the address in step', async ({ page }) => {
   await page.goto('/')
   await page.getByRole('radio', { name: 'Air' }).click()
   await expect(page).toHaveURL(/layer=air/)
+  // Air and temperature estimate the corridors, and say so under the key.
+  await expect(page.getByText('Corridors: estimated from the doors')).toBeVisible()
   await page.getByRole('radio', { name: 'Plan' }).click()
   await expect(page).toHaveURL(/view=plan/)
+  await page.getByRole('radio', { name: 'Beds' }).click()
+  await expect(page.getByText('Corridors: estimated from the doors')).toHaveCount(0)
 })
 
 test('list view lists every room, and a row opens its day', async ({ page }) => {

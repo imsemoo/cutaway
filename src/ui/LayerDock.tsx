@@ -71,6 +71,8 @@ function Legend({ layer }: { layer: Layer }) {
         <span>{mid}</span>
         <span>{hi}</span>
       </span>
+      {/* Rooms show their own sensor; the corridors have none. */}
+      <span className="ramp__note">Corridors: estimated from the doors</span>
     </div>
   )
 }

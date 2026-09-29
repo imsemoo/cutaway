@@ -1,8 +1,8 @@
 import { useFrame, useThree } from '@react-three/fiber'
 import { useEffect, useLayoutEffect, useMemo, useRef } from 'react'
-import { BoxGeometry, Color, MathUtils, Matrix4, PlaneGeometry, type InstancedMesh, type MeshStandardMaterial } from 'three'
+import { BoxGeometry, Color, MathUtils, Matrix4, type InstancedMesh, type MeshStandardMaterial } from 'three'
 import { mergeGeometries } from 'three/examples/jsm/utils/BufferGeometryUtils.js'
-import { CORRIDOR_W, LEVELS, LINKS, PLATE, STOREY, WING, WINGS } from '../data/floorplan'
+import { CORRIDOR_W, LEVELS, LINKS, PLATE, STOREY, WINGS } from '../data/floorplan'
 import { HOSPITAL, scopeLevel, shows, type Scope } from '../state/scope'
 import { useWard } from '../state/store'
 import { WALL_T, buildShell } from './geometry'
@@ -66,12 +66,10 @@ function placeLinks(mesh: InstancedMesh | null, height: number, scope: Scope) {
 */
 export function Shell() {
   const shell = useMemo(buildShell, [])
-  const floor = useMemo(() => new PlaneGeometry(WING.w, WING.d).rotateX(-Math.PI / 2).translate(WING.w / 2, 0.005, WING.d / 2), [])
   const walls = useRef<InstancedMesh>(null)
   const low = useRef<InstancedMesh>(null)
   const fixtures = useRef<InstancedMesh>(null)
   const glass = useRef<InstancedMesh>(null)
-  const ground = useRef<InstancedMesh>(null)
   const plates = useRef<InstancedMesh>(null)
   const linkFloors = useRef<InstancedMesh>(null)
   const linkGlass = useRef<InstancedMesh>(null)
@@ -104,7 +102,6 @@ export function Shell() {
 
   useLayoutEffect(() => {
     for (const mesh of [walls, low, fixtures, glass]) placeWings(mesh.current, rise.current, scope)
-    placeWings(ground.current, 1, scope)
     placeLinks(linkFloors.current, 1, scope)
     placeLinks(linkGlass.current, rise.current, scope)
     // Plates under the levels on show: all six for the hospital, one for a level, none for a wing.
@@ -123,12 +120,11 @@ export function Shell() {
   useEffect(
     () => () => {
       Object.values(shell).forEach((g) => g.dispose())
-      floor.dispose()
       plate.dispose()
       link.floor.dispose()
       link.glass.dispose()
     },
-    [shell, floor, plate, link],
+    [shell, plate, link],
   )
 
   useFrame((_, dt) => {
@@ -159,10 +155,6 @@ export function Shell() {
       </instancedMesh>
       <instancedMesh ref={linkGlass} args={[link.glass, undefined, LINKS.length]} renderOrder={2}>
         <meshStandardMaterial color="#9fc3e0" roughness={0.1} metalness={0.1} transparent opacity={0.32} depthWrite={false} />
-      </instancedMesh>
-      {/* Each wing's footprint: the corridors read as the palest surface. */}
-      <instancedMesh ref={ground} args={[floor, undefined, WINGS.length]} receiveShadow>
-        <meshStandardMaterial color="#f8f9fa" roughness={1} />
       </instancedMesh>
       <instancedMesh ref={walls} args={[shell.walls, undefined, WINGS.length]} castShadow receiveShadow>
         <meshStandardMaterial ref={mats.walls} color={TONES.walls[0]} roughness={0.92} />

@@ -19,7 +19,7 @@ The full film, 40 seconds, goes on to the way to the nearest free pump, the whol
   - A level shows its six wings on one plate, joined by glazed links, in 3D or as one floor plan.
   - A click on a wing flies into it, and a trail above the panel leads back up: Hospital, Level 4, A wing.
 - **3D, plan and list views of the same floor.** Plan view drops every wall to a section cut 15 cm above the floor and inks it, so the model turns into the architect's drawing without swapping scenes. List view is the same data as an accessible table.
-- **Four data layers on the floors:** bed state, temperature, CO₂ and call-light wait time, each with its key.
+- **Four data layers on the floors:** bed state, temperature, CO₂ and call-light wait time, each with its key. In temperature and CO₂ each room shows its own sensor, and the corridors, which have none, are estimated from the doors that open onto them, with isolines and a darker line at the alert limit: a warm room's heat shows spilling out of its door, and a stale lounge's air down the corridor.
 - **A 24-hour replay** with play, three speeds and a scrubber marked with every alert.
 - **Or live.** Live mode connects to a feed and builds the floor from events as they arrive. In the demo, a mock server in a Web Worker streams the simulated day at a simulated minute a second, over the JSON protocol a real integration server would use. The footer shows the connection. "Take the server down for 4 seconds" shows the recovery: retries back off, the stage says the floor is stale, and the missed events are replayed on reconnect.
 - **The nearest free equipment, and the way to it.** From any bed, "Nearest free" finds the pump, wheelchair, bladder scanner or, in the ICU, ventilator that is quickest to reach on foot anywhere in the hospital, and draws the way on the floors with the walking time. When the nearest one is in another wing the view pulls out to the level, and to the whole hospital when the way takes a lift.
@@ -47,6 +47,10 @@ The full film, 40 seconds, goes on to the way to the nearest free pump, the whol
   - `npm run models` merges each model's parts into one mesh, with vertex colours and a tint mask.
   - It welds and quantises the meshes, compresses them with meshopt, and writes one file: `public/models/ward.glb`, 129 KB for 17,208 triangles.
   - The loader and decoder arrive after the first frame, so the scene opens on simple proxies and the detail streams in.
+- **Corridor fields in the fragment shader.** Walls keep one room's air from another's, so the rooms stay flat at their own readings, and only the corridors are interpolated: inverse distance weighting over the wing's 38 doors, each weighted by its width, since a wide opening moves more air.
+  - Every wing is built to one plan, so the doors are one uniform array for all 36 wings. The readings sit in a 38 × 36 float texture, a row per wing, which the shader reads with `texelFetch`; a new minute uploads 1,368 numbers, not geometry.
+  - Isolines every half degree or 100 ppm, and the limit line, come from screen-space derivatives, and fade before they would crowd into a moiré from far away.
+  - Switching the layer back and forth on one page, orbiting at the top quality level, cost 1 or 2 fps.
 - **One draw call per model, with tinted parts.** A small shader patch applies each instance's colour only where the tint mask says so: a blanket shows the patient's acuity and a pump's housing its status, while the frame and the pole keep their own colours.
 - **Instanced at hospital scale.** Every wing is built to one plan, so each part of the shell (walls, glass, counters, lifts) is one instanced mesh for all 36 wings; so are the glazed links between them, and the 1,368 room floors are one more. Only what is in scope is packed into the instances drawn, so a wing out of view costs nothing, not even its vertices. The whole hospital draws in 33 draw calls.
 - **Per-instance level of detail.** Every instance picks its detailed model or its proxy by its distance from the point the camera looks at, with hysteresis, across two instanced meshes. Detail goes where the eye is: a wing's overview draws 15k triangles and a close-up about 130k, and in the whole-hospital view equipment drops to plain boxes.
@@ -82,7 +86,7 @@ The on-screen meter (`?stats`) shows the frame rate while moving, draw calls, tr
 
 ## Tests
 
-- `npm test` runs 49 unit tests on the hospital plan, the simulation, the queries, the alert wording, the live feed and the wayfinding:
+- `npm test` runs 51 unit tests on the hospital plan, the simulation, the queries, the alert wording, the live feed, the wayfinding and the corridor field:
   - six levels of six wings, with unique ids, every room inside its wing and no two rooms overlapping;
   - the same seed gives the same day, and every wing a day of its own;
   - more than 3,000 pieces of equipment, each only ever inside its own wing;
@@ -93,7 +97,8 @@ The on-screen meter (`?stats`) shows the frame rate while moving, draw calls, tr
   - the 14:30 story the case study describes still holds;
   - the day rebuilt from the event log, batch by batch, reads exactly like the recording at every five-minute reading, and holds nothing from later in the day;
   - the connection resumes after a drop, asks again after a gap, drops a silent link and backs off with jitter;
-  - every room reaches every other; a way follows corridors and links, crosses to the next wing, the other row or another level when it must, and counts a lift ride in time but not in metres.
+  - every room reaches every other; a way follows corridors and links, crosses to the next wing, the other row or another level when it must, and counts a lift ride in time but not in metres;
+  - every room has a door on a corridor, and every wing matches the plan room for room, so the shader finds each reading where it looks.
 - `npm run test:e2e` runs 14 browser tests at desktop and phone size, with real WebGL. They cover shared links, layers, the list view, search, playback, sideways scroll, recovery from a lost WebGL context, live mode through a server outage, the whole hospital, a level and a wing, the panel opening each new place at its top, and the way to the nearest free pump. Every test fails on a console error.
 - `npm run check` runs types, lint, the unit tests, the build and the bundle budget. CI runs all of it, plus the browser tests, before every deploy; a failing check blocks the deploy.
 

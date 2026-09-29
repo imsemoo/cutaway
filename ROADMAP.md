@@ -66,6 +66,7 @@ What shows platform thinking.
 
 ### 2.4 Sensor heatmaps in a shader
 - Temperature and CO₂ fields interpolated across the floor from sensor points in GLSL, in place of one flat colour per room.
+- Built differently: interpolating through walls would invent readings, since walls keep one room's air from another's. Rooms keep their own sensor's colour; the corridors, which have no sensors, are estimated from the doors that open onto them.
 
 ## Phase 3: positioning
 
@@ -92,5 +93,5 @@ A `<ward-twin>` web component and a postMessage API, so a host dashboard can sel
 - [x] 2.1 Live mode: a mock server streams the day over the feed protocol; resume by sequence number, backoff with jitter, a silence watchdog and one render per frame; `?mode=live`; the protocol in docs/live-feed.md
 - [x] 2.2 A whole hospital: six levels of six wings, 1,368 rooms, 1,008 beds and 3,006 tracked assets; an exploded view, a view of each level with its wings joined by glazed links, a building map and a trail back up; the whole hospital in 33 draw calls at 72 to 90 fps on an integrated GPU
 - [x] 2.3 Wayfinding: the nearest free pump, wheelchair, scanner or ventilator from any bed, by walking time across wings, rows and lifts, drawn on the floors
-- [ ] 2.4 Sensor heatmaps in a shader
+- [x] 2.4 Sensor heatmaps in a shader: corridors estimated in the fragment shader from the rooms' doors, with isolines and the alert limit; rooms keep their own readings
 - [ ] Phase 3

@@ -9,6 +9,7 @@ import { useWard } from '../state/store'
 import { Beds } from './Beds'
 import { CameraRig } from './CameraRig'
 import { Equipment } from './Equipment'
+import { Corridors } from './Corridors'
 import { Floors } from './Floors'
 import { FrameMeter } from './FrameMeter'
 import { Overlays } from './Overlays'
@@ -126,6 +127,7 @@ export default function Scene() {
       <ShadowOnDemand />
       <Ground />
       <Shell />
+      <Corridors />
       <Floors />
       <Beds />
       <Equipment />
