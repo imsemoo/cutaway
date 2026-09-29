@@ -88,5 +88,8 @@ A `<ward-twin>` web component and a postMessage API, so a host dashboard can sel
 - [x] 1.2 Real assets through a glTF pipeline: 8 models, 17,208 triangles, 129 KB, per-instance LOD, stated in the case study.
 - [ ] 1.3 Resilience on real hardware: adaptive quality and context-loss recovery are done and tested; the real-phone test still needs a device
 - [x] 1.4 A film: 34 seconds, captured on a controlled clock, with a loop in the README; the case study opens on it.
-- [ ] Phase 2
+- [x] 2.1 Live mode: a mock server streams the day over the feed protocol; resume by sequence number, backoff with jitter, a silence watchdog and one render per frame; `?mode=live`; the protocol in docs/live-feed.md
+- [ ] 2.2 A whole hospital
+- [ ] 2.3 Wayfinding
+- [ ] 2.4 Sensor heatmaps in a shader
 - [ ] Phase 3

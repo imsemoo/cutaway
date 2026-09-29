@@ -2,7 +2,7 @@
 
 [![Check and deploy](https://github.com/imsemoo/ward-twin/actions/workflows/deploy.yml/badge.svg)](https://github.com/imsemoo/ward-twin/actions/workflows/deploy.yml)
 
-A concept digital twin of one hospital floor, in the browser. A 3D model of a 28-bed ward and ICU replays a simulated day: beds turning over from occupied to cleaning to ready, a room warming up through an HVAC fault, call lights waiting too long at shift change, and equipment moving between rooms.
+A concept digital twin of one hospital floor, in the browser. A 3D model of a 28-bed ward and ICU replays a simulated day, or follows it live from a streaming feed: beds turning over from occupied to cleaning to ready, a room warming up through an HVAC fault, call lights waiting too long at shift change, and equipment moving between rooms.
 
 Everything on screen is simulated. There is no real hospital, patient or reading behind it.
 
@@ -10,13 +10,14 @@ Everything on screen is simulated. There is no real hospital, patient or reading
 
 The full film, 34 seconds: [film/ward-twin-720.mp4](film/ward-twin-720.mp4), captured frame by frame on a controlled clock by `tools/film`.
 
-**Live:** https://imsemoo.github.io/ward-twin/ (add `?stats` for a frame meter)
+**Live:** https://imsemoo.github.io/ward-twin/ (add `?stats` for a frame meter, or open [live mode](https://imsemoo.github.io/ward-twin/?mode=live))
 
 ## What it does
 
 - **3D, plan and list views of the same floor.** Plan view drops every wall to a section cut 15 cm above the floor and inks it, so the model turns into the architect's drawing without swapping scenes. List view is the same data as an accessible table.
 - **Four data layers on the floors:** bed state, temperature, CO₂ and call-light wait time, each with its key.
 - **A 24-hour replay** with play, three speeds and a scrubber marked with every alert.
+- **Or live.** Live mode connects to a feed and builds the floor from events as they arrive. In the demo, a mock server in a Web Worker streams the simulated day at a simulated minute a second, over the JSON protocol a real integration server would use. The footer shows the connection. "Take the server down for 4 seconds" shows the recovery: retries back off, the stage says the floor is stale, and the missed events are replayed on reconnect.
 - **Pick anything:** click a room or a piece of equipment, or search for it with `/`. The camera flies to it and the side panel shows its day: bed states as a strip, 24-hour temperature and CO₂ charts with limits, call lights, and the equipment in the room.
 - **Every view is a link.** The address bar keeps the view, layer, time and selection, so `?view=plan&layer=air&t=18:00&select=FAM` opens the family lounge at its stuffiest hour.
 - **Alerts that only know the present.** Each alert is worded at the replay minute ("Pressed at 14:21, 9 min without an answer"), so scrubbing never leaks what happens next.
@@ -25,6 +26,12 @@ The full film, 34 seconds: [film/ward-twin-720.mp4](film/ward-twin-720.mp4), cap
 
 - React 19, TypeScript, React Three Fiber, drei and three.js, bundled with Vite.
 - **The day is generated in a Web Worker** from a fixed seed, so the scene's first frame never waits on the simulation and every visitor replays the same day.
+- **One day, two sources.** Every view is a function of a day and a minute. Replay hands the views the recorded day. Live mode folds a stream of events into the same shape, where anything still going on (a bed's current state, a call light that is on, an open alert) ends at Infinity until an event closes it. No view needed to know which source it reads.
+- **A feed that stays whole.** Every event carries a sequence number.
+  - A gap, four silent seconds or a dropped connection all end in a new subscribe that asks only for the missed events. The server sends the whole day so far when it no longer holds them.
+  - Reconnects back off from half a second, doubling to 15 s, at a random point in the upper half of each wait, so screens do not all come back at once.
+  - Events are applied at most once a frame, so a catch-up burst costs one render.
+  - Building with `VITE_FEED_URL=wss://…` points the same client at a real WebSocket server. The protocol is in [docs/live-feed.md](docs/live-feed.md).
 - **On-demand rendering.** The canvas draws only when something changes: a camera move, a new minute, a hover. An idle ward costs no GPU time.
 - **Models through a glTF pipeline.** Beds, patients, bedside furniture and five kinds of equipment are parametric models in code (`tools/models`).
   - `npm run models` merges each model's parts into one mesh, with vertex colours and a tint mask.
@@ -43,7 +50,7 @@ The full film, 34 seconds: [film/ward-twin-720.mp4](film/ward-twin-720.mp4), cap
   - It stops flipping after four changes, so a device on the edge settles.
   - `?quality=0` to `3` pins a level.
 - **Context loss recovery.** If the GPU driver resets, the scene says it has paused, and the canvas is rebuilt from scratch when the context comes back. A browser test forces a loss and checks the recovery.
-- **Code-split by weight.** The interface paints first (83 kB gzipped). The scene and three.js follow (212 kB and 99 kB), then the model loader (20 kB). Ambient occlusion and SMAA load last, and only when the quality level uses them (157 kB, a third of it SMAA's lookup texture). CI enforces a budget for every chunk.
+- **Code-split by weight.** The interface paints first (85 kB gzipped). The scene and three.js follow (212 kB and 99 kB), then the model loader (20 kB). Ambient occlusion and SMAA load last, and only when the quality level uses them (157 kB, a third of it SMAA's lookup texture). CI enforces a budget for every chunk.
 - **The camera fits the building by projection:** it projects the floor's corners through a trial camera to find the distance and offset that keep the model clear of the overlays, and turns the building lengthwise on tall screens.
 - Reduced motion turns camera flights and the wall animation into cuts.
 
@@ -63,14 +70,16 @@ The on-screen meter (`?stats`) shows the frame rate while moving, draw calls, tr
 
 ## Tests
 
-- `npm test` runs 23 unit tests on the simulation, the queries and the alert wording:
+- `npm test` runs 38 unit tests on the simulation, the queries, the alert wording and the live feed:
   - the same seed gives the same day;
   - every bed has exactly one state at every minute;
   - a vacated bed turns over in order;
   - alerts never word the future;
   - rooms never overlap, and no two pieces of equipment share a spot;
-  - the 14:30 story the case study describes still holds.
-- `npm run test:e2e` runs 8 browser tests at desktop and phone size, with real WebGL. They cover shared links, layers, the list view, search, playback, sideways scroll and recovery from a lost WebGL context, and every test fails on a console error.
+  - the 14:30 story the case study describes still holds;
+  - the day rebuilt from the event log, batch by batch, reads exactly like the recording at every five-minute reading, and holds nothing from later in the day;
+  - the connection resumes after a drop, asks again after a gap, drops a silent link and backs off with jitter.
+- `npm run test:e2e` runs 9 browser tests at desktop and phone size, with real WebGL. They cover shared links, layers, the list view, search, playback, sideways scroll, recovery from a lost WebGL context, and live mode through a server outage. Every test fails on a console error.
 - `npm run check` runs types, lint, the unit tests, the build and the bundle budget. CI runs all of it, plus the browser tests, before every deploy; a failing check blocks the deploy.
 
 ## Run it
