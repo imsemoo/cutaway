@@ -46,36 +46,39 @@ await page.waitForTimeout(1500) // the models, fetched on real time too
 await hold(4.5)
 // The four layers, one at a time.
 await radio('Temperature')
-await hold(2.2)
-await radio('Air')
-await hold(2.2)
-await radio('Call lights')
 await hold(2.0)
+await radio('Air')
+await hold(2.0)
+await radio('Call lights')
+await hold(1.8)
 await radio('Beds')
-await hold(1.2)
+await hold(1.0)
 // Into the warm room.
 await page.keyboard.press('/')
 await page.keyboard.type('4A09', { delay: 60 })
 await page.keyboard.press('Enter')
 await radio('Temperature')
-await hold(4.5)
+await hold(4.0)
 // Play the afternoon: the room's temperature crosses its limit.
 await page.getByRole('button', { name: /Play/ }).first().click()
-await hold(5.5)
+await hold(5.0)
 await page.getByRole('button', { name: 'Pause the replay' }).click()
-await hold(1.0)
-// The plan: the walls sink to a section cut.
+await hold(0.8)
+// The nearest free pump, and the way to it.
 await radio('Beds')
-await radio('Plan')
-await hold(3.5)
-// The low pump, found by search.
-await radio('3D')
-await page.keyboard.press('/')
-await page.keyboard.type('IVP-01', { delay: 60 })
-await page.keyboard.press('Enter')
+await page.getByRole('button', { name: 'Infusion pump', exact: true }).click()
 await hold(4.0)
-// Back to the whole floor.
-await click('.tool')
+// Out to the whole hospital, its six levels drawn apart.
+await click('.building__all')
+await hold(5.0)
+// One level: six wings joined by glazed links, then as a floor plan.
+await click('.building__n[aria-label="Level 4"]')
+await hold(3.5)
+await radio('Plan')
+await hold(3.0)
+// Back into the wing.
+await radio('3D')
+await page.getByRole('button', { name: /^Level 4, A wing:/ }).filter({ visible: true }).first().click()
 await hold(3.5)
 
 console.log(`${frame} frames, ${(frame / FPS).toFixed(1)} s`)

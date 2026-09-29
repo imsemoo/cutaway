@@ -88,7 +88,7 @@ A `<ward-twin>` web component and a postMessage API, so a host dashboard can sel
 - [x] 1.1 Tests and CI: 23 unit tests, 8 browser tests at two sizes, lint, types and a bundle budget, all gating the deploy, green on GitHub.
 - [x] 1.2 Real assets through a glTF pipeline: 8 models, 17,208 triangles, 129 KB, per-instance LOD, stated in the case study.
 - [ ] 1.3 Resilience on real hardware: adaptive quality and context-loss recovery are done and tested; the real-phone test still needs a device
-- [x] 1.4 A film: 34 seconds, captured on a controlled clock, with a loop in the README; the case study opens on it.
+- [x] 1.4 A film: captured on a controlled clock, with a loop in the README; the case study opens on it. Re-recorded at 40 seconds for the hospital and wayfinding.
 - [x] 2.1 Live mode: a mock server streams the day over the feed protocol; resume by sequence number, backoff with jitter, a silence watchdog and one render per frame; `?mode=live`; the protocol in docs/live-feed.md
 - [x] 2.2 A whole hospital: six levels of six wings, 1,368 rooms, 1,008 beds and 3,006 tracked assets; an exploded view, a view of each level with its wings joined by glazed links, a building map and a trail back up; the whole hospital in 33 draw calls at 72 to 90 fps on an integrated GPU
 - [x] 2.3 Wayfinding: the nearest free pump, wheelchair, scanner or ventilator from any bed, by walking time across wings, rows and lifts, drawn on the floors

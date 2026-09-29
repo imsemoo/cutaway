@@ -8,7 +8,7 @@ Everything on screen is simulated. There is no real hospital, patient or reading
 
 ![The opening shot and the four layers](film/ward-twin-loop.webp)
 
-The full film, 34 seconds: [film/ward-twin-720.mp4](film/ward-twin-720.mp4), captured frame by frame on a controlled clock by `tools/film`.
+The full film, 40 seconds, goes on to the way to the nearest free pump, the whole hospital and a level: [film/ward-twin-720.mp4](film/ward-twin-720.mp4), captured frame by frame on a controlled clock by `tools/film`.
 
 **Live:** https://imsemoo.github.io/ward-twin/ (add `?stats` for a frame meter, or open [live mode](https://imsemoo.github.io/ward-twin/?mode=live))
 
@@ -94,7 +94,7 @@ The on-screen meter (`?stats`) shows the frame rate while moving, draw calls, tr
   - the day rebuilt from the event log, batch by batch, reads exactly like the recording at every five-minute reading, and holds nothing from later in the day;
   - the connection resumes after a drop, asks again after a gap, drops a silent link and backs off with jitter;
   - every room reaches every other; a way follows corridors and links, crosses to the next wing, the other row or another level when it must, and counts a lift ride in time but not in metres.
-- `npm run test:e2e` runs 13 browser tests at desktop and phone size, with real WebGL. They cover shared links, layers, the list view, search, playback, sideways scroll, recovery from a lost WebGL context, live mode through a server outage, the whole hospital, a level and a wing, and the way to the nearest free pump. Every test fails on a console error.
+- `npm run test:e2e` runs 14 browser tests at desktop and phone size, with real WebGL. They cover shared links, layers, the list view, search, playback, sideways scroll, recovery from a lost WebGL context, live mode through a server outage, the whole hospital, a level and a wing, the panel opening each new place at its top, and the way to the nearest free pump. Every test fails on a console error.
 - `npm run check` runs types, lint, the unit tests, the build and the bundle budget. CI runs all of it, plus the browser tests, before every deploy; a failing check blocks the deploy.
 
 ## Run it
