@@ -1,9 +1,9 @@
 import { describe, expect, it } from 'vitest'
-import { FLOOR, ROOMS } from '../data/floorplan'
+import { BED_ROOMS, LEVELS, ROOMS, ROOM_BY_ID, STORY, WING, WINGS, WING_BY_CODE } from '../data/floorplan'
 import { simulate } from '../sim/simulate'
 import { describe as word, severityAt } from './alerts'
 import { assetPositions } from './positions'
-import { clock, duration, sample, spanAt } from './query'
+import { assetAt, clock, duration, sample, spanAt } from './query'
 
 const day = simulate()
 
@@ -66,32 +66,51 @@ describe('alert wording', () => {
   })
 })
 
-describe('the floor plan', () => {
-  it('keeps every room inside the building', () => {
+describe('the hospital plan', () => {
+  it('has six levels of six wings: more than a thousand rooms and a thousand beds', () => {
+    expect(LEVELS).toHaveLength(6)
+    expect(WINGS).toHaveLength(36)
+    expect(ROOMS.length).toBeGreaterThan(1000)
+    expect(BED_ROOMS.length).toBe(36 * 28)
+    expect(new Set(ROOMS.map((r) => r.id)).size).toBe(ROOMS.length)
+  })
+
+  it('keeps the ids the case study and old links use in the story wing', () => {
+    const ids = WING_BY_CODE[STORY].rooms.map((r) => r.id)
+    for (const id of ['4A01', '4A09', '4B04', '4C02', 'FAM', 'EQP', 'LIFT']) expect(ids).toContain(id)
+    expect(WING_BY_CODE['4D'].rooms.map((r) => r.id)).toContain('4D-FAM')
+  })
+
+  it('keeps every room inside its wing', () => {
     for (const r of ROOMS) {
-      expect(r.x, r.id).toBeGreaterThanOrEqual(0)
-      expect(r.z, r.id).toBeGreaterThanOrEqual(0)
-      expect(r.x + r.w, r.id).toBeLessThanOrEqual(FLOOR.w + 1e-9)
-      expect(r.z + r.d, r.id).toBeLessThanOrEqual(FLOOR.d + 1e-9)
+      const w = WING_BY_CODE[r.wing]
+      expect(r.level, r.id).toBe(w.level)
+      expect(r.x, r.id).toBeGreaterThanOrEqual(w.x)
+      expect(r.z, r.id).toBeGreaterThanOrEqual(w.z)
+      expect(r.x + r.w, r.id).toBeLessThanOrEqual(w.x + WING.w + 1e-9)
+      expect(r.z + r.d, r.id).toBeLessThanOrEqual(w.z + WING.d + 1e-9)
     }
   })
 
-  it('never lets two rooms overlap', () => {
+  it('never lets two rooms on a level overlap', () => {
     for (let i = 0; i < ROOMS.length; i++) {
       for (let j = i + 1; j < ROOMS.length; j++) {
         const a = ROOMS[i]
         const b = ROOMS[j]
+        if (a.level !== b.level) continue
         const overlap = a.x < b.x + b.w - 1e-9 && b.x < a.x + a.w - 1e-9 && a.z < b.z + b.d - 1e-9 && b.z < a.z + a.d - 1e-9
-        expect(overlap, `${a.id} and ${b.id}`).toBe(false)
+        if (overlap) expect.fail(`${a.id} and ${b.id} overlap`)
       }
     }
   })
 
   it('never stands two pieces of equipment in the same spot', () => {
+    const byId = new Map(day.assets.map((a) => [a.id, a]))
     for (let m = 0; m < 1440; m += 30) {
       const seen = new Set<string>()
       for (const [id, p] of assetPositions(day, m)) {
-        const key = `${p.x.toFixed(2)},${p.z.toFixed(2)}`
+        const level = ROOM_BY_ID[assetAt(byId.get(id)!, m).loc].level
+        const key = `${level}:${p.x.toFixed(2)},${p.z.toFixed(2)}`
         expect(seen.has(key), `${id} at ${key}, minute ${m}`).toBe(false)
         seen.add(key)
       }

@@ -5,7 +5,10 @@ export interface Room {
   id: string
   name: string
   kind: RoomKind
-  /** Plan rectangle in metres: x runs east, z runs south. */
+  level: number
+  /** The wing's code, such as 4A. */
+  wing: string
+  /** Plan rectangle in metres on its level: x runs east, z runs south. */
   x: number
   z: number
   w: number
@@ -51,6 +54,8 @@ export interface AssetSpan {
 export interface Asset {
   id: string
   kind: AssetKind
+  /** Equipment belongs to one wing and moves only within it. */
+  wing: string
   spans: AssetSpan[]
   /** Battery % every 5 minutes, pumps only. */
   battery?: number[]

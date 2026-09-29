@@ -4,19 +4,21 @@ import { BoxGeometry, Color, Matrix4, type InstancedMesh } from 'three'
 import { BatchedText, Text as TroikaText } from 'troika-three-text'
 import monoUrl from '@fontsource/fragment-mono/files/fragment-mono-latin-400-normal.woff?url'
 import sansUrl from '@fontsource/schibsted-grotesk/files/schibsted-grotesk-latin-600-normal.woff?url'
-import { ROOMS } from '../data/floorplan'
+import { ROOMS, WING_BY_CODE, isBed } from '../data/floorplan'
 import type { Day, Layer, Room } from '../data/types'
 import { BED, NEUTRAL_FLOOR, SUPPORT_FLOOR, callColor } from '../lib/colors'
 import { airColor, tempColor } from './ramp'
 import { activeCall, bedAt, sample } from '../lib/query'
 import { useWard } from '../state/store'
 import { WALL_T } from './geometry'
+import { isWing, shows } from '../state/scope'
+import { levelY } from './layout'
 
 const SLAB = 0.07
-const isBed = (r: Room) => r.kind === 'patient' || r.kind === 'icu'
 
 export function roomColor(day: Day, r: Room, t: number, layer: Layer, out: Color) {
   const env = day.rooms[r.id]
+  if (!env) return out.set(NEUTRAL_FLOOR)
   switch (layer) {
     case 'beds': {
       if (!isBed(r)) return out.set(SUPPORT_FLOOR)
@@ -35,7 +37,7 @@ export function roomColor(day: Day, r: Room, t: number, layer: Layer, out: Color
   }
 }
 
-/** Every room's floor as one instanced mesh: one draw call, and the pick target. */
+/** Every room's floor in the hospital as one instanced mesh: one draw call, and the pick target. */
 export function Floors() {
   const ref = useRef<InstancedMesh>(null)
   const geometry = useMemo(() => new BoxGeometry(1, SLAB, 1), [])
@@ -43,30 +45,35 @@ export function Floors() {
   const t = useWard((s) => s.t)
   const layer = useWard((s) => s.layer)
   const hover = useWard((s) => s.hover)
+  const scope = useWard((s) => s.scope)
   const setHover = useWard((s) => s.setHover)
   const select = useWard((s) => s.select)
   const plan = useWard((s) => s.view === 'plan')
   const invalidate = useThree((s) => s.invalidate)
 
+  // The rooms in scope, packed into the first instances; slots maps an instance back to its room.
+  const slots = useMemo(() => ROOMS.filter((r) => shows(scope, r.wing)), [scope])
   useLayoutEffect(() => {
     const mesh = ref.current
     if (!mesh) return
     const m = new Matrix4()
-    ROOMS.forEach((r, i) => {
+    slots.forEach((r, i) => {
       m.makeScale(r.w - WALL_T * 2, 1, r.d - WALL_T * 2)
-      m.setPosition(r.x + r.w / 2, SLAB / 2, r.z + r.d / 2)
+      m.setPosition(r.x + r.w / 2, levelY(r.level) + SLAB / 2, r.z + r.d / 2)
       mesh.setMatrixAt(i, m)
     })
+    mesh.count = slots.length
     mesh.instanceMatrix.needsUpdate = true
     mesh.computeBoundingSphere()
-  }, [])
+    invalidate()
+  }, [slots, invalidate])
 
   useLayoutEffect(() => {
     const mesh = ref.current
     if (!mesh) return
     const c = new Color()
     const white = new Color('#ffffff')
-    ROOMS.forEach((r, i) => {
+    slots.forEach((r, i) => {
       if (day) roomColor(day, r, t, layer, c)
       else c.set(NEUTRAL_FLOOR)
       if (hover === r.id) c.lerp(white, 0.45)
@@ -74,11 +81,11 @@ export function Floors() {
     })
     if (mesh.instanceColor) mesh.instanceColor.needsUpdate = true
     invalidate()
-  }, [day, t, layer, hover, invalidate])
+  }, [day, t, layer, hover, slots, invalidate])
 
   const onMove = (e: ThreeEvent<PointerEvent>) => {
     e.stopPropagation()
-    const id = e.instanceId !== undefined ? ROOMS[e.instanceId].id : null
+    const id = e.instanceId !== undefined ? slots[e.instanceId]?.id ?? null : null
     if (id !== useWard.getState().hover) setHover(id)
     document.body.style.cursor = id ? 'pointer' : ''
   }
@@ -87,9 +94,10 @@ export function Floors() {
     document.body.style.cursor = ''
   }
   const onClick = (e: ThreeEvent<MouseEvent>) => {
-    if (e.delta > 5 || e.instanceId === undefined) return
+    const room = e.instanceId === undefined ? undefined : slots[e.instanceId]
+    if (e.delta > 5 || !room) return
     e.stopPropagation()
-    select({ type: 'room', id: ROOMS[e.instanceId].id })
+    select({ type: 'room', id: room.id })
   }
 
   return (
@@ -104,21 +112,23 @@ export function Floors() {
       >
         <meshStandardMaterial roughness={0.95} />
       </instancedMesh>
-      <RoomLabels plan={plan} />
+      {isWing(scope) && <RoomLabels key={scope} wing={scope} plan={plan} />}
     </group>
   )
 }
 
 /**
-  Room numbers set into the floor, like tags on a plan. Thirty-eight labels
-  in two batched meshes, one per typeface: two draw calls instead of 38.
+  Room numbers set into the floor, like tags on a plan. The wing's 38
+  labels in two batched meshes, one per typeface: two draw calls instead of
+  38. A level or the whole hospital is seen from too far to read them, so they have none.
 */
-function RoomLabels({ plan }: { plan: boolean }) {
+function RoomLabels({ wing, plan }: { wing: string; plan: boolean }) {
   const invalidate = useThree((s) => s.invalidate)
   const batches = useMemo(() => {
     const mono = new BatchedText()
     const sans = new BatchedText()
-    const members = ROOMS.map((r) => {
+    const { rooms, level } = WING_BY_CODE[wing]
+    const members = rooms.map((r) => {
       const bed = isBed(r)
       const t = new TroikaText()
       t.text = bed ? r.id : r.name.toUpperCase()
@@ -135,11 +145,11 @@ function RoomLabels({ plan }: { plan: boolean }) {
       return { t, bed }
     })
     for (const b of [mono, sans]) {
-      b.position.y = SLAB + 0.012
+      b.position.y = levelY(level) + SLAB + 0.012
       b.raycast = () => undefined
     }
     return { mono, sans, members }
-  }, [])
+  }, [wing])
 
   useEffect(() => {
     for (const { t, bed } of batches.members) {

@@ -7,7 +7,8 @@ import { mockTransport } from './live/mock'
 import { SEED } from './sim/simulate'
 import { STEP } from './sim/time'
 import { useQuality } from './state/quality'
-import { syncUrl, useWard } from './state/store'
+import { covers, syncUrl, useWard } from './state/store'
+import { Building } from './ui/Building'
 import { LayerDock, ViewTools } from './ui/LayerDock'
 import { ListView } from './ui/ListView'
 import { Panel } from './ui/Panel'
@@ -19,8 +20,8 @@ import { TopBar } from './ui/TopBar'
 const Scene = lazy(() => import('./scene/Scene'))
 
 export default function App() {
-  // Only whether there is a day: in live mode the day changes every second, and the whole tree need not follow.
-  const ready = useWard((s) => s.day !== null)
+  // Only whether the day covers what is on show: in live mode the day changes every second, and the whole tree need not follow.
+  const ready = useWard(covers)
   const view = useWard((s) => s.view)
   const live = useWard((s) => s.mode === 'live')
   const lost = useQuality((s) => s.lost)
@@ -43,6 +44,7 @@ export default function App() {
           </Suspense>
         </WebGLBoundary>
         <Tags />
+        <Building />
         <LayerDock />
         <ViewTools />
         {view === 'list' && <ListView />}
@@ -74,11 +76,13 @@ function useSimulation() {
   const setDay = useWard((s) => s.setDay)
   useEffect(() => {
     const worker = new Worker(new URL('./sim/worker.ts', import.meta.url), { type: 'module' })
-    worker.onmessage = (e: MessageEvent<{ day: Day; ms: number }>) => {
-      setDay(e.data.day, e.data.ms)
-      worker.terminate()
+    worker.onmessage = (e: MessageEvent<{ day: Day; ms: number; complete: boolean }>) => {
+      setDay(e.data.day, e.data.ms, e.data.complete)
+      if (e.data.complete) worker.terminate()
     }
-    worker.postMessage({ seed: SEED })
+    // The wing on show first, then the rest of the hospital.
+    const { scope } = useWard.getState()
+    worker.postMessage({ seed: SEED, first: scope === 'all' ? undefined : scope })
     return () => worker.terminate()
   }, [setDay])
 }

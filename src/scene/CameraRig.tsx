@@ -2,16 +2,28 @@ import { CameraControls, CameraControlsImpl } from '@react-three/drei'
 import { useThree } from '@react-three/fiber'
 import { useEffect, useRef, useState } from 'react'
 import { MathUtils, PerspectiveCamera, Vector3 } from 'three'
-import { FLOOR, ROOM_BY_ID, center } from '../data/floorplan'
+import { LEVELS, PLATE, ROOM_BY_ID, STOREY, WING, WING_BY_CODE, center } from '../data/floorplan'
+import { HOSPITAL, scopeLevel, type Scope } from '../state/scope'
 import { useWard } from '../state/store'
 import { assetPositions } from '../lib/positions'
+import { assetAt } from '../lib/query'
+import { RIM, levelY } from './layout'
 
 const { ACTION } = CameraControlsImpl
 const DEG = MathUtils.degToRad
 const reduced = typeof window !== 'undefined' && matchMedia('(prefers-reduced-motion: reduce)').matches
 
-const CORNERS = [0, FLOOR.w].flatMap((x) => [0, FLOOR.wallHeight].flatMap((y) => [0, FLOOR.d].map((z) => new Vector3(x, y, z))))
-const MID = new Vector3(FLOOR.w / 2, 0, FLOOR.d / 2)
+/** The box to frame: one wing or one level at its height, or the whole tower with its levels drawn apart. */
+function frameBox(scope: Scope) {
+  // A level's plate reaches a rim beyond its wings.
+  if (scope === HOSPITAL) return { x: -RIM, y: 0, z: -RIM, w: PLATE.w + RIM * 2, h: levelY(LEVELS[LEVELS.length - 1]) + STOREY.wallHeight, d: PLATE.d + RIM * 2 }
+  const level = scopeLevel(scope)
+  if (level) return { x: -RIM, y: levelY(level), z: -RIM, w: PLATE.w + RIM * 2, h: STOREY.wallHeight, d: PLATE.d + RIM * 2 }
+  const w = WING_BY_CODE[scope]
+  return { x: w.x, y: levelY(w.level), z: w.z, w: WING.w, h: STOREY.wallHeight, d: WING.d }
+}
+const cornersOf = (b: ReturnType<typeof frameBox>) =>
+  [b.x, b.x + b.w].flatMap((x) => [b.y, b.y + b.h].flatMap((y) => [b.z, b.z + b.d].map((z) => new Vector3(x, y, z))))
 
 type Area = { left: number; right: number; top: number; bottom: number }
 
@@ -25,19 +37,19 @@ function safeArea(height: number): Area {
 }
 
 /**
-  Distance and screen offset that fit the whole floor into the safe area,
-  found by projecting the building's corners through a trial camera.
+  Distance and screen offset that fit a box into the safe area, found by
+  projecting its corners through a trial camera.
 */
-function fitFloor(azimuth: number, polar: number, fov: number, aspect: number, area: Area) {
+function fitBox(corners: Vector3[], mid: Vector3, azimuth: number, polar: number, fov: number, aspect: number, area: Area) {
   const cam = new PerspectiveCamera(fov, aspect, 0.1, 2000)
   const dir = new Vector3().setFromSphericalCoords(1, Math.max(polar, 1e-4), azimuth)
   const v = new Vector3()
   const bounds = (d: number) => {
-    cam.position.copy(MID).addScaledVector(dir, d)
-    cam.lookAt(MID)
+    cam.position.copy(mid).addScaledVector(dir, d)
+    cam.lookAt(mid)
     cam.updateMatrixWorld()
     let minX = Infinity, maxX = -Infinity, minY = Infinity, maxY = -Infinity
-    for (const c of CORNERS) {
+    for (const c of corners) {
       v.copy(c).project(cam)
       minX = Math.min(minX, v.x); maxX = Math.max(maxX, v.x)
       minY = Math.min(minY, v.y); maxY = Math.max(maxY, v.y)
@@ -45,7 +57,7 @@ function fitFloor(azimuth: number, polar: number, fov: number, aspect: number, a
     return { minX, maxX, minY, maxY }
   }
   let lo = 5
-  let hi = 800
+  let hi = 2000
   for (let i = 0; i < 36; i++) {
     const mid = (lo + hi) / 2
     const b = bounds(mid)
@@ -65,6 +77,7 @@ export function CameraRig() {
   const [c, setControls] = useState<CameraControlsImpl | null>(null)
   const opened = useRef(false)
   const view = useWard((s) => s.view)
+  const scope = useWard((s) => s.scope)
   const selection = useWard((s) => s.selection)
   const resetKey = useWard((s) => s.resetKey)
   const size = useThree((s) => s.size)
@@ -80,49 +93,60 @@ export function CameraRig() {
   useEffect(() => {
     if (!c) return
     const { aspect, fov, height } = frame.current
+    // A plan is drawn from straight above; the whole hospital keeps its angle, or the top level would hide the rest.
+    const whole = scope === HOSPITAL
+    const above = plan && !whole
     c.minPolarAngle = 0
-    c.maxPolarAngle = plan ? 0 : DEG(78)
+    c.maxPolarAngle = above ? 0 : DEG(78)
     c.minAzimuthAngle = -Infinity
     c.maxAzimuthAngle = Infinity
-    c.mouseButtons.left = plan ? ACTION.TRUCK : ACTION.ROTATE
+    c.mouseButtons.left = above ? ACTION.TRUCK : ACTION.ROTATE
     c.mouseButtons.right = ACTION.TRUCK
-    c.touches.one = plan ? ACTION.TOUCH_TRUCK : ACTION.TOUCH_ROTATE
+    c.touches.one = above ? ACTION.TOUCH_TRUCK : ACTION.TOUCH_ROTATE
     c.minDistance = 6
-    c.maxDistance = 220
+    c.maxDistance = whole ? 1400 : scopeLevel(scope) ? 700 : 220
     // The first move is the opening shot, down from the plan; the rest are quick.
     const first = !opened.current
     c.smoothTime = first ? 0.9 : 0.35
     opened.current = true
     const animate = !reduced
 
-    // A tall screen turns the building so its long side runs up the screen.
-    const azimuth = plan ? (portrait ? DEG(-90) : 0) : portrait ? DEG(-68) : DEG(-18)
+    // A tall screen turns a wing so its long side runs up the screen; the whole hospital stays across, its levels stacked up the screen.
+    const azimuth = whole ? DEG(-24) : above ? (portrait ? DEG(-90) : 0) : portrait ? DEG(-68) : DEG(-18)
     const area = safeArea(height)
 
     const state = useWard.getState()
-    let focus: { x: number; z: number } | undefined
-    if (selection?.type === 'room') focus = center(ROOM_BY_ID[selection.id])
-    if (selection?.type === 'asset' && state.day) focus = assetPositions(state.day, state.t).get(selection.id)
+    let focus: { x: number; y: number; z: number } | undefined
+    if (selection?.type === 'room') {
+      const r = ROOM_BY_ID[selection.id]
+      focus = { ...center(r), y: levelY(r.level) }
+    }
+    const asset = selection?.type === 'asset' ? state.day?.assets.find((a) => a.id === selection.id) : undefined
+    const at = asset && state.day ? assetPositions(state.day, state.t).get(asset.id) : undefined
+    if (asset && at) focus = { ...at, y: levelY(ROOM_BY_ID[assetAt(asset, state.t).loc].level) }
 
     if (focus) {
-      const polar = plan ? 0 : DEG(42)
-      const dist = (plan ? 30 : 24) * (portrait ? 1.35 : 1)
+      const polar = above ? 0 : DEG(42)
+      const dist = (above ? 30 : 24) * (portrait ? 1.35 : 1)
       const halfH = dist * Math.tan(DEG(fov) / 2)
       // Keep the visitor's own angle, except on the opening shot of a shared link.
-      void c.rotateTo(plan || first ? azimuth : c.azimuthAngle, polar, animate)
-      void c.moveTo(focus.x, 0, focus.z, animate)
+      void c.rotateTo(above || first ? azimuth : c.azimuthAngle, polar, animate)
+      void c.moveTo(focus.x, focus.y, focus.z, animate)
       void c.dollyTo(dist, animate)
       void c.setFocalOffset(0, ((area.top + area.bottom) / 2) * halfH, 0, animate)
       return
     }
 
-    const polar = plan ? 0 : DEG(portrait ? 46 : 50)
-    const fit = fitFloor(azimuth, polar, fov, aspect, area)
+    // The hospital is seen from lower down, so the levels drawn apart show their floors.
+    const polar = above ? 0 : DEG(whole ? 60 : portrait ? 46 : 50)
+    const box = frameBox(scope)
+    const mid = new Vector3(box.x + box.w / 2, box.y + (whole ? box.h / 2 : 0), box.z + box.d / 2)
+    const fit = fitBox(cornersOf(box), mid, azimuth, polar, fov, aspect, area)
     void c.rotateTo(azimuth, polar, animate)
-    void c.moveTo(MID.x, 0, MID.z, animate)
+    void c.moveTo(mid.x, mid.y, mid.z, animate)
     void c.dollyTo(fit.dist, animate)
     void c.setFocalOffset(fit.offset.x, fit.offset.y, 0, animate)
-  }, [c, plan, selection?.type, selection?.id, resetKey, aspectStep, portrait])
+  }, [c, plan, scope, selection?.type, selection?.id, resetKey, aspectStep, portrait])
 
   return <CameraControls ref={setControls} makeDefault />
 }

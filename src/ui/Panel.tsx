@@ -1,6 +1,6 @@
-import { ArrowLeft, BatteryLow, BellRing, Info, OctagonAlert, Play, TriangleAlert, Unplug } from 'lucide-react'
-import { BED_ROOMS, ROOM_BY_ID } from '../data/floorplan'
-import type { Alert, AssetKind, BedState, Day, Severity } from '../data/types'
+import { ArrowLeft, BatteryLow, BellRing, Building2, Info, OctagonAlert, Play, TriangleAlert, Unplug } from 'lucide-react'
+import { BED_ROOMS, LEVELS, ROOMS, ROOM_BY_ID, STORY, WINGS, WING_BY_CODE, wingName, type Wing } from '../data/floorplan'
+import type { Alert, Asset, AssetKind, BedState, Day, Severity } from '../data/types'
 import { describe, severityAt } from '../lib/alerts'
 import { ASSET_STATUS, BED, SEVERITY } from '../lib/colors'
 import {
@@ -9,6 +9,7 @@ import {
   BED_LABEL,
   activeAlerts,
   activeCall,
+  alertWing,
   assetAt,
   assetsIn,
   batteryAt,
@@ -20,8 +21,10 @@ import {
   sample,
 } from '../lib/query'
 import { outage } from '../live/mock'
-import { useWard } from '../state/store'
+import { HOSPITAL, levelScope, scopeLevel, scopeWings } from '../state/scope'
+import { covers, useWard } from '../state/store'
 import { DayChart, StateStrip } from './Chart'
+import { wingSummaries, type WingSummary } from './summary'
 
 const SEV_ICON: Record<Severity, typeof Info> = { critical: OctagonAlert, warning: TriangleAlert, info: Info }
 /** A span that is still going on (live mode) ends now, as far as anyone knows. */
@@ -30,10 +33,11 @@ const STATES: BedState[] = ['occupied', 'ready', 'cleaning', 'dirty', 'blocked']
 
 export function Panel() {
   const day = useWard((s) => s.day)
+  const ready = useWard(covers)
   const selection = useWard((s) => s.selection)
   return (
     <aside className="panel" aria-label="Details">
-      {!day ? (
+      {!day || !ready ? (
         <PanelSkeleton />
       ) : selection?.type === 'room' ? (
         <RoomDetail day={day} id={selection.id} />
@@ -63,20 +67,82 @@ function PanelSkeleton() {
 /* ---------- Overview ---------- */
 
 function Overview({ day }: { day: Day }) {
+  const scope = useWard((s) => s.scope)
+  const level = scopeLevel(scope)
+  return (
+    <>
+      <Trail />
+      {scope === HOSPITAL ? (
+        <HospitalOverview day={day} />
+      ) : level ? (
+        <LevelOverview day={day} level={level} />
+      ) : (
+        <WingOverview day={day} wing={WING_BY_CODE[scope]} />
+      )}
+    </>
+  )
+}
+
+/** Where the view stands in the building, with a way back up at every step. */
+function Trail() {
+  const scope = useWard((s) => s.scope)
+  const setScope = useWard((s) => s.setScope)
+  if (scope === HOSPITAL) return null
+  const level = scopeLevel(scope) ?? WING_BY_CODE[scope].level
+  const steps = [
+    { label: 'Hospital', to: HOSPITAL },
+    { label: `Level ${level}`, to: levelScope(level) },
+    ...(scopeLevel(scope) ? [] : [{ label: `${scope.slice(1)} wing`, to: scope }]),
+  ]
+  return (
+    <nav className="trail" aria-label="Where you are">
+      <ol>
+        {steps.map((s, i) =>
+          i === steps.length - 1 ? (
+            <li key={s.to} aria-current="location">
+              {s.label}
+            </li>
+          ) : (
+            <li key={s.to}>
+              <button className="link" onClick={() => setScope(s.to)}>
+                {s.label}
+              </button>
+            </li>
+          ),
+        )}
+      </ol>
+    </nav>
+  )
+}
+
+const RANK: Record<Severity, number> = { critical: 0, warning: 1, info: 2 }
+/** The alerts open at t, the worst first, then the oldest. */
+function ranked(day: Day, t: number, keep: (a: Alert) => boolean = () => true) {
+  return activeAlerts(day, t)
+    .filter(keep)
+    .sort((a, b) => RANK[severityAt(a, day, t)] - RANK[severityAt(b, day, t)] || a.from - b.from)
+}
+
+function PlayButton() {
+  const t = useWard((s) => s.t)
+  const playing = useWard((s) => s.playing)
+  const setPlaying = useWard((s) => s.setPlaying)
+  if (playing) return null
+  return (
+    <button className="btn" onClick={() => setPlaying(true)}>
+      <Play size={15} strokeWidth={2} aria-hidden="true" /> Play from {clock(t)}
+    </button>
+  )
+}
+
+function WingOverview({ day, wing }: { day: Day; wing: Wing }) {
   const t = useWard((s) => s.t)
   const select = useWard((s) => s.select)
-  const counts = census(day, t)
-  const total = BED_ROOMS.length
-  const rank: Record<Severity, number> = { critical: 0, warning: 1, info: 2 }
-  const alerts = activeAlerts(day, t).sort((a, b) => rank[severityAt(a, day, t)] - rank[severityAt(b, day, t)] || a.from - b.from)
-  const setPlaying = useWard((s) => s.setPlaying)
-  const playing = useWard((s) => s.playing)
+  const setScope = useWard((s) => s.setScope)
   const live = useWard((s) => s.mode === 'live')
-  const groups = [
-    { label: 'Ward 4A', rooms: BED_ROOMS.filter((r) => r.id.startsWith('4A')) },
-    { label: 'Ward 4B', rooms: BED_ROOMS.filter((r) => r.id.startsWith('4B')) },
-    { label: 'ICU', rooms: BED_ROOMS.filter((r) => r.kind === 'icu') },
-  ]
+  const counts = census(day, t, wing.beds)
+  const alerts = ranked(day, t, (a) => alertWing(a) === wing.code)
+  const groups = wing.wards.map((w) => ({ label: w.label, rooms: wing.beds.filter((r) => r.id.startsWith(w.prefix)) }))
 
   return (
     <>
@@ -84,18 +150,17 @@ function Overview({ day }: { day: Day }) {
         {live ? (
           <LiveIntro />
         ) : (
-          <>
-            <p>
-              A digital twin of one hospital floor, replaying a simulated day. Colour the floor by beds, temperature, air or call lights; pick any room or
-              piece of equipment for its day.
-            </p>
-            {!playing && (
-              <button className="btn" onClick={() => setPlaying(true)}>
-                <Play size={15} strokeWidth={2} aria-hidden="true" /> Play from {clock(t)}
-              </button>
-            )}
-          </>
+          <p>
+            A digital twin of a {BED_ROOMS.length.toLocaleString('en-US')}-bed hospital, replaying a simulated day. This is {wingName(wing)}: two wards and an
+            ICU. Colour the floor by beds, temperature, air or call lights; pick any room or piece of equipment for its day.
+          </p>
         )}
+        <div className="intro__actions">
+          {!live && <PlayButton />}
+          <button className="btn btn--quiet" onClick={() => setScope(HOSPITAL)}>
+            <Building2 size={15} strokeWidth={2} aria-hidden="true" /> The whole hospital
+          </button>
+        </div>
       </section>
 
       <section className="section">
@@ -103,8 +168,8 @@ function Overview({ day }: { day: Day }) {
           Beds at <time className="num">{clock(t)}</time>
         </h2>
         <p className="lede">
-          <strong className="num">{counts.occupied}</strong> of {total} occupied. {counts.ready} ready for a patient, {counts.cleaning} being cleaned,{' '}
-          {counts.dirty} waiting for cleaning.
+          <strong className="num">{counts.occupied}</strong> of {wing.beds.length} occupied. {counts.ready} ready for a patient, {counts.cleaning} being
+          cleaned, {counts.dirty} waiting for cleaning.
         </p>
         <div className="board">
           {groups.map((g) => (
@@ -148,9 +213,9 @@ function Overview({ day }: { day: Day }) {
         </h2>
         {alerts.length === 0 ? (
           <p className="empty">
-            {live
-              ? `Nothing is flagged at ${clock(t)}.`
-              : `Nothing is flagged at ${clock(t)}. Drag the timeline into the afternoon: discharges, a warm room and a low pump battery all land between 13:00 and 16:00.`}
+            {!live && wing.code === STORY
+              ? `Nothing is flagged at ${clock(t)}. Drag the timeline into the afternoon: discharges, a warm room and a low pump battery all land between 13:00 and 16:00.`
+              : `Nothing is flagged here at ${clock(t)}.`}
           </p>
         ) : (
           <ul className="alerts">
@@ -163,9 +228,182 @@ function Overview({ day }: { day: Day }) {
 
       <section className="section">
         <h2 className="h2">Equipment</h2>
-        <Fleet day={day} t={t} />
+        <Fleet t={t} assets={day.assets.filter((a) => a.wing === wing.code)} />
       </section>
     </>
+  )
+}
+
+/** How many alerts the hospital and level overviews list; each wing lists all of its own. */
+const SHOWN = 12
+
+function LevelOverview({ day, level }: { day: Day; level: number }) {
+  const t = useWard((s) => s.t)
+  const select = useWard((s) => s.select)
+  const live = useWard((s) => s.mode === 'live')
+  const wings = scopeWings(levelScope(level))
+  const codes = new Set(wings.map((w) => w.code))
+  const beds = wings.flatMap((w) => w.beds)
+  const counts = census(day, t, beds)
+  const alerts = ranked(day, t, (a) => codes.has(alertWing(a) ?? ''))
+  const summaries = wingSummaries(day, t)
+
+  return (
+    <>
+      <section className="section intro">
+        {live ? (
+          <LiveIntro />
+        ) : (
+          <p>
+            Level {level} of the hospital: six wings of two wards and an ICU, {beds.length} beds in all, joined by glazed links. Pick a wing to go in.
+          </p>
+        )}
+        {!live && (
+          <div className="intro__actions">
+            <PlayButton />
+          </div>
+        )}
+      </section>
+
+      <section className="section">
+        <h2 className="h2">
+          Beds at <time className="num">{clock(t)}</time>
+        </h2>
+        <p className="lede">
+          <strong className="num">{counts.occupied}</strong> of {beds.length} occupied. {counts.ready} ready for a patient, {counts.cleaning} being cleaned,{' '}
+          {counts.dirty} waiting for cleaning.
+        </p>
+        <div className="levels__wings levels__wings--level">
+          {wings.map((w) => (
+            <WingChip key={w.code} wing={w} summary={summaries.get(w.code)!} />
+          ))}
+        </div>
+      </section>
+
+      <section className="section">
+        <h2 className="h2">
+          Needs attention <span className="count num">{alerts.length}</span>
+        </h2>
+        {alerts.length === 0 ? (
+          <p className="empty">Nothing is flagged on level {level} at {clock(t)}.</p>
+        ) : (
+          <>
+            <ul className="alerts">
+              {alerts.slice(0, SHOWN).map((a) => (
+                <AlertRow key={a.id} alert={a} day={day} t={t} onPick={() => select(a.target)} named />
+              ))}
+            </ul>
+            {alerts.length > SHOWN && (
+              <p className="small">
+                The worst {SHOWN} of {alerts.length}. Each wing lists all of its own.
+              </p>
+            )}
+          </>
+        )}
+      </section>
+
+      <section className="section">
+        <h2 className="h2">Equipment</h2>
+        <Fleet t={t} assets={day.assets.filter((a) => codes.has(a.wing))} />
+      </section>
+    </>
+  )
+}
+
+function HospitalOverview({ day }: { day: Day }) {
+  const t = useWard((s) => s.t)
+  const select = useWard((s) => s.select)
+  const setScope = useWard((s) => s.setScope)
+  const live = useWard((s) => s.mode === 'live')
+  const counts = census(day, t)
+  const alerts = ranked(day, t)
+  const wings = wingSummaries(day, t)
+
+  return (
+    <>
+      <section className="section intro">
+        {live ? (
+          <LiveIntro />
+        ) : (
+          <p>
+            The whole hospital: six levels of six wings, with {ROOMS.length.toLocaleString('en-US')} rooms, {BED_ROOMS.length.toLocaleString('en-US')} beds and{' '}
+            {day.assets.length.toLocaleString('en-US')} tracked pieces of equipment. The levels are drawn apart so every floor shows. Pick a wing to go in.
+          </p>
+        )}
+        {!live && (
+          <div className="intro__actions">
+            <PlayButton />
+          </div>
+        )}
+      </section>
+
+      <section className="section">
+        <h2 className="h2">
+          Beds at <time className="num">{clock(t)}</time>
+        </h2>
+        <p className="lede">
+          <strong className="num">{counts.occupied.toLocaleString('en-US')}</strong> of {BED_ROOMS.length.toLocaleString('en-US')} occupied. {counts.ready} ready
+          for a patient, {counts.cleaning} being cleaned, {counts.dirty} waiting for cleaning.
+        </p>
+        <ul className="levels">
+          {[...LEVELS].reverse().map((level) => (
+            <li key={level} className="levels__row">
+              <button className="link levels__label" onClick={() => setScope(levelScope(level))}>
+                Level {level}
+              </button>
+              <span className="levels__wings">
+                {WINGS.filter((w) => w.level === level).map((w) => (
+                  <WingChip key={w.code} wing={w} summary={wings.get(w.code)!} />
+                ))}
+              </span>
+            </li>
+          ))}
+        </ul>
+      </section>
+
+      <section className="section">
+        <h2 className="h2">
+          Needs attention <span className="count num">{alerts.length}</span>
+        </h2>
+        {alerts.length === 0 ? (
+          <p className="empty">Nothing is flagged anywhere at {clock(t)}.</p>
+        ) : (
+          <>
+            <ul className="alerts">
+              {alerts.slice(0, SHOWN).map((a) => (
+                <AlertRow key={a.id} alert={a} day={day} t={t} onPick={() => select(a.target)} named />
+              ))}
+            </ul>
+            {alerts.length > SHOWN && (
+              <p className="small">
+                The worst {SHOWN} of {alerts.length}. Each wing lists all of its own.
+              </p>
+            )}
+          </>
+        )}
+      </section>
+
+      <section className="section">
+        <h2 className="h2">Equipment</h2>
+        <Fleet t={t} assets={day.assets} />
+      </section>
+    </>
+  )
+}
+
+/** A wing as a button: its code, how full it is, and a mark when something critical is open in it. */
+export function WingChip({ wing, summary }: { wing: Wing; summary: WingSummary }) {
+  const setScope = useWard((s) => s.setScope)
+  return (
+    <button
+      className={`chip${summary.critical ? ' chip--critical' : ''}`}
+      style={{ ['--full' as string]: (summary.occupied / summary.beds).toFixed(2) }}
+      onClick={() => setScope(wing.code)}
+      aria-label={`${wingName(wing)}: ${summary.occupied} of ${summary.beds} beds occupied, ${summary.alerts} ${summary.alerts === 1 ? 'alert' : 'alerts'}`}
+      title={`${wingName(wing)} · ${summary.occupied} of ${summary.beds} occupied · ${summary.alerts} alerts`}
+    >
+      <span className="num">{wing.code}</span>
+    </button>
   )
 }
 
@@ -178,9 +416,9 @@ function LiveIntro() {
     <>
       <p>
         {MOCK
-          ? 'A digital twin of one hospital floor, fed live: a mock server streams the simulated day as events, a simulated minute each second. '
-          : 'A digital twin of one hospital floor, built from the events of a live feed. '}
-        The floor holds only what has arrived, so nothing from later in the day is known.
+          ? 'A digital twin of a hospital, fed live: a mock server streams the simulated day as events, a simulated minute each second. '
+          : 'A digital twin of a hospital, built from the events of a live feed. '}
+        The floors hold only what has arrived, so nothing from later in the day is known.
       </p>
       {MOCK && (
         <button className="btn" onClick={() => outage(4000)} disabled={!up}>
@@ -191,17 +429,19 @@ function LiveIntro() {
   )
 }
 
-function AlertRow({ alert, day, t, onPick }: { alert: Alert; day: Day; t: number; onPick?: () => void }) {
+function AlertRow({ alert, day, t, onPick, named }: { alert: Alert; day: Day; t: number; onPick?: () => void; named?: boolean }) {
   const severity = severityAt(alert, day, t)
   const Icon = SEV_ICON[severity]
-  const where = alert.target.id
+  // Across the hospital, name the wing; the story wing's support rooms and equipment keep short ids that do not.
+  const wing = alertWing(alert)
+  const where = named && wing && !alert.target.id.includes(wing) ? `${alert.target.id} · ${wing}` : alert.target.id
   const body = (
     <>
       <Icon className="alert__icon" size={16} strokeWidth={2} style={{ color: SEVERITY[severity] }} aria-label={severity} />
-        <span className="alert__body">
-          <span className="alert__title">
-            {alert.title} <span className="alert__where num">{where}</span>
-          </span>
+      <span className="alert__body">
+        <span className="alert__title">
+          {alert.title} <span className="alert__where num">{where}</span>
+        </span>
         <span className="alert__detail">{describe(alert, day, t)}</span>
       </span>
       <span className="alert__age num" aria-label={`flagged at ${clock(alert.from)}`}>
@@ -214,7 +454,7 @@ function AlertRow({ alert, day, t, onPick }: { alert: Alert; day: Day; t: number
 
 const KINDS: AssetKind[] = ['pump', 'vent', 'chair', 'xray', 'scanner']
 
-function Fleet({ day, t }: { day: Day; t: number }) {
+function Fleet({ t, assets }: { t: number; assets: Asset[] }) {
   const select = useWard((s) => s.select)
   return (
     <table className="fleet">
@@ -229,7 +469,7 @@ function Fleet({ day, t }: { day: Day; t: number }) {
       </thead>
       <tbody>
         {KINDS.map((k) => {
-          const list = day.assets.filter((a) => a.kind === k)
+          const list = assets.filter((a) => a.kind === k)
           const st = list.map((a) => assetAt(a, t).status)
           const inUse = st.filter((s) => s === 'in-use').length
           const free = st.filter((s) => s === 'available').length
@@ -239,17 +479,17 @@ function Fleet({ day, t }: { day: Day; t: number }) {
             <tr key={k}>
               <th scope="row">
                 {firstFree ? (
-                  <button className="link" onClick={() => select({ type: 'asset', id: firstFree.id })} title={`Show the nearest free ${ASSET_LABEL[k].toLowerCase()}`}>
+                  <button className="link" onClick={() => select({ type: 'asset', id: firstFree.id })} title={`Show a free ${ASSET_LABEL[k].toLowerCase()}`}>
                     {ASSET_LABEL[k]}
                   </button>
                 ) : (
                   ASSET_LABEL[k]
                 )}
               </th>
-              <td className="num">{inUse}</td>
-              <td className="num">{free}</td>
+              <td className="num">{inUse.toLocaleString('en-US')}</td>
+              <td className="num">{free.toLocaleString('en-US')}</td>
               <td className="num" title="Charging or waiting for cleaning">
-                {away}
+                {away.toLocaleString('en-US')}
               </td>
             </tr>
           )
@@ -265,7 +505,7 @@ function Back() {
   const select = useWard((s) => s.select)
   return (
     <button className="back" onClick={() => select(null)}>
-      <ArrowLeft size={16} strokeWidth={1.75} aria-hidden="true" /> Whole floor
+      <ArrowLeft size={16} strokeWidth={1.75} aria-hidden="true" /> The whole wing
     </button>
   )
 }

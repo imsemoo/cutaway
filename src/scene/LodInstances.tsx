@@ -6,6 +6,8 @@ import { markShadows } from './shadows'
 /** What a set of instances looks like right now. Mutate it, then bump `version`. */
 export interface InstanceData {
   x: Float32Array
+  /** The height of the instance's level. */
+  y: Float32Array
   z: Float32Array
   rot: Float32Array
   show: Uint8Array
@@ -26,6 +28,7 @@ export function useInstanceData(n: number, init?: (d: InstanceData) => void) {
 export function makeInstanceData(n: number): InstanceData {
   return {
     x: new Float32Array(n),
+    y: new Float32Array(n),
     z: new Float32Array(n),
     rot: new Float32Array(n),
     show: new Uint8Array(n).fill(1),
@@ -91,14 +94,14 @@ export function LodInstances({ data, count, hi, lo, material, near, y = 0.07, on
     loMap.current.length = 0
     for (let i = 0; i < count; i++) {
       if (!d.show[i]) continue
-      p.set(d.x[i], 0, d.z[i])
+      p.set(d.x[i], d.y[i], d.z[i])
       const dist = p.distanceTo(focus)
       const was = tier.current[i]
       const now = hi && close && (dist < near || (was === 1 && dist < near + 3)) ? 1 : 0
       if (now !== was) switched = true
       tier.current[i] = now
       m.makeRotationY(d.rot[i])
-      m.setPosition(d.x[i], y, d.z[i])
+      m.setPosition(d.x[i], d.y[i] + y, d.z[i])
       const mesh = now ? hm : lm
       if (!mesh) continue
       const slot = now ? nHi++ : nLo++

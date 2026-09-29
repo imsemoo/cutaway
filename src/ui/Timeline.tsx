@@ -1,7 +1,8 @@
 import { History, Pause, Play, Radio } from 'lucide-react'
 import { useEffect, useMemo, useState } from 'react'
 import { SEVERITY } from '../lib/colors'
-import { clock } from '../lib/query'
+import { alertWing, clock } from '../lib/query'
+import { HOSPITAL, scopeWings } from '../state/scope'
 import { SPEEDS, useWard, type Mode } from '../state/store'
 
 const MODES: { id: Mode; label: string; icon: typeof Play }[] = [
@@ -15,13 +16,20 @@ export function Timeline() {
   const playing = useWard((s) => s.playing)
   const speed = useWard((s) => s.speed)
   const mode = useWard((s) => s.mode)
+  const scope = useWard((s) => s.scope)
   const setT = useWard((s) => s.setT)
   const setPlaying = useWard((s) => s.setPlaying)
   const setSpeed = useWard((s) => s.setSpeed)
   const setMode = useWard((s) => s.setMode)
   const live = mode === 'live'
 
-  const marks = useMemo(() => (day ? day.alerts.map((a) => ({ id: a.id, at: a.from, color: SEVERITY[a.severity], title: `${clock(a.from)} ${a.title}` })) : []), [day])
+  // A wing or a level marks all of its alerts; the whole hospital, only the critical ones, or the rail would be solid.
+  const marks = useMemo(() => {
+    const on = new Set(scopeWings(scope).map((w) => w.code))
+    return (day?.alerts ?? [])
+      .filter((a) => (scope === HOSPITAL ? a.severity === 'critical' : on.has(alertWing(a) ?? '')))
+      .map((a) => ({ id: a.id, at: a.from, color: SEVERITY[a.severity], title: `${clock(a.from)} ${a.title} ${a.target.id}` }))
+  }, [day, scope])
 
   return (
     <footer className="timeline" data-mode={mode}>

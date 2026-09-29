@@ -2,7 +2,8 @@ import { BedDouble, BellRing, RotateCcw, Thermometer, Wind } from 'lucide-react'
 import type { BedState, Layer } from '../data/types'
 import { AIR_STOPS, BED, TEMP_STOPS, callColor } from '../lib/colors'
 import { BED_LABEL, census } from '../lib/query'
-import { useWard } from '../state/store'
+import { HOSPITAL, scopeWings } from '../state/scope'
+import { covers, useWard } from '../state/store'
 
 const LAYERS: { id: Layer; label: string; icon: typeof BedDouble }[] = [
   { id: 'beds', label: 'Beds', icon: BedDouble },
@@ -35,8 +36,10 @@ export function LayerDock() {
 function Legend({ layer }: { layer: Layer }) {
   const day = useWard((s) => s.day)
   const t = useWard((s) => s.t)
+  const scope = useWard((s) => s.scope)
+  const ready = useWard(covers)
   if (layer === 'beds') {
-    const c = day ? census(day, t) : undefined
+    const c = day && ready ? census(day, t, scopeWings(scope).flatMap((w) => w.beds)) : undefined
     return (
       <ul className="legend">
         {(['occupied', 'ready', 'cleaning', 'dirty', 'blocked'] as BedState[]).map((s) => (
@@ -75,13 +78,15 @@ function Legend({ layer }: { layer: Layer }) {
 export function ViewTools() {
   const resetView = useWard((s) => s.resetView)
   const view = useWard((s) => s.view)
+  // The whole hospital keeps its angle in plan view, so it still orbits.
+  const flat = useWard((s) => s.view === 'plan' && s.scope !== HOSPITAL)
   if (view === 'list') return null
   return (
     <div className="tools">
-      <button className="tool" onClick={resetView} aria-label="Reset the camera to the whole floor" title="Whole floor">
+      <button className="tool" onClick={resetView} aria-label="Reset the camera" title="Reset the camera">
         <RotateCcw size={16} strokeWidth={1.75} aria-hidden="true" />
       </button>
-      <p className="hint">{view === 'plan' ? 'Drag to pan, scroll to zoom' : 'Drag to orbit, right-drag to pan, scroll to zoom'}</p>
+      <p className="hint">{flat ? 'Drag to pan, scroll to zoom' : 'Drag to orbit, right-drag to pan, scroll to zoom'}</p>
     </div>
   )
 }

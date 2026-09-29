@@ -936,6 +936,20 @@ button {
 .btn:hover {
   background: var(--accent);
 }
+.btn--quiet {
+  background: var(--surface);
+  color: var(--text);
+  box-shadow: inset 0 0 0 1px var(--line-2);
+}
+.btn--quiet:hover {
+  background: var(--surface-2);
+  color: var(--text);
+}
+.intro__actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
 .btn:disabled {
   opacity: 0.45;
   background: var(--text);
@@ -1237,9 +1251,10 @@ button {
 .stale {
   position: absolute;
   top: 12px;
-  left: 12px;
+  left: 50%;
+  translate: -50% 0;
   z-index: 4;
-  max-width: calc(100% - 80px);
+  max-width: calc(100% - 300px);
   margin: 0;
   padding: 7px 12px 7px 10px;
   border: 1px solid var(--line);
@@ -1249,6 +1264,177 @@ button {
   box-shadow: var(--shadow);
   color: var(--text);
   font-size: 13px;
+}
+
+/* A level's name at the front corner of its plate in the hospital view. */
+.tag--quiet {
+  padding: 2px 6px;
+  border-color: transparent;
+  background: rgb(255 255 255 / 0.85);
+  box-shadow: none;
+}
+
+/* Where the view stands: Hospital › Level 4 › A wing. */
+.trail {
+  padding: 12px 20px 0;
+  font-size: 12.5px;
+  color: var(--text-3);
+}
+.trail ol {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.trail li + li::before {
+  content: '›';
+  margin-right: 4px;
+  color: var(--line-2);
+}
+.trail [aria-current] {
+  color: var(--text);
+  font-weight: 500;
+}
+.levels__wings--level {
+  margin-top: 14px;
+}
+
+/* ---------- The building ---------- */
+
+/*
+  Wings shaded by how full they are, from an empty ward's pale floor to the
+  occupied blue of the bed board; a red corner when something is critical.
+*/
+.building {
+  position: absolute;
+  top: 12px;
+  left: 12px;
+  z-index: 3;
+  display: grid;
+  gap: 8px;
+  padding: 8px 10px 10px;
+  border: 1px solid var(--line);
+  border-radius: var(--r);
+  background: rgb(255 255 255 / 0.9);
+  box-shadow: var(--shadow);
+}
+.building__all {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  height: 26px;
+  padding: 0 8px;
+  border: 0;
+  border-radius: 5px;
+  background: transparent;
+  color: var(--text-2);
+  font-size: 12.5px;
+  cursor: pointer;
+}
+.building__all:hover {
+  background: var(--surface-2);
+  color: var(--text);
+}
+.building__all[aria-pressed='true'] {
+  background: var(--accent-soft);
+  color: var(--accent-2);
+  font-weight: 500;
+}
+.building__grid {
+  display: grid;
+  gap: 3px;
+}
+.building__level {
+  display: flex;
+  align-items: center;
+  gap: 3px;
+}
+.building__n {
+  width: 14px;
+  padding: 0;
+  border: 0;
+  background: none;
+  color: var(--text-3);
+  font: 10.5px/1 var(--mono);
+  cursor: pointer;
+}
+.building__n:hover,
+.building__level.is-here .building__n {
+  color: var(--accent);
+  font-weight: 600;
+}
+.building__level.is-here .building__cell {
+  outline: 1px solid var(--accent);
+}
+.building__cell,
+.chip {
+  position: relative;
+  border: 0;
+  background: color-mix(in oklch, var(--full-ink, #7189b8) calc(var(--full) * 100%), #eef1f4);
+  cursor: pointer;
+}
+.building__cell {
+  width: 16px;
+  height: 11px;
+  padding: 0;
+  border-radius: 2px;
+}
+.building__cell:hover {
+  outline: 1px solid var(--text-2);
+}
+.building__cell.is-here {
+  outline: 2px solid var(--accent);
+  outline-offset: 1px;
+}
+.building__cell.is-critical::after,
+.chip--critical::after {
+  content: '';
+  position: absolute;
+  top: -2px;
+  right: -2px;
+  width: 5px;
+  height: 5px;
+  border-radius: 50%;
+  background: var(--crit);
+  box-shadow: 0 0 0 1px #fff;
+}
+.levels {
+  display: grid;
+  gap: 6px;
+  margin: 14px 0 0;
+  padding: 0;
+  list-style: none;
+}
+.levels__row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+.levels__label {
+  flex: none;
+  width: 52px;
+  color: var(--text-3);
+  font-size: 12.5px;
+}
+.levels__wings {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+}
+.chip {
+  /* Lighter at full, so the code on it keeps its contrast. */
+  --full-ink: #93a8c9;
+  min-width: 38px;
+  height: 26px;
+  padding: 0 6px;
+  border-radius: 5px;
+  color: var(--text);
+  font-size: 12px;
+}
+.chip:hover {
+  box-shadow: 0 0 0 1px var(--text-2);
 }
 
 /* ---------- Small screens ---------- */
@@ -1319,6 +1505,14 @@ button {
 @media (max-width: 560px) {
   .brand {
     flex: 1 1 100%;
+  }
+  /* A phone's stage is too small to share with the building map; the panel below carries the same moves. */
+  .building {
+    display: none;
+  }
+  /* A level's wing names shrink to their codes, so neighbours do not overlap. */
+  .tag__more {
+    display: none;
   }
   .badge {
     order: 2;

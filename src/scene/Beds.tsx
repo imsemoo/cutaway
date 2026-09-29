@@ -3,6 +3,8 @@ import { useLayoutEffect } from 'react'
 import { BED_ROOMS, bedPose } from '../data/floorplan'
 import { bedAt } from '../lib/query'
 import { useWard } from '../state/store'
+import { shows } from '../state/scope'
+import { levelY } from './layout'
 import { LodInstances, useInstanceData, type InstanceData } from './LodInstances'
 import { getMaterial, getProxies, useModels } from './models'
 
@@ -14,13 +16,15 @@ const place = (d: InstanceData) =>
   BED_ROOMS.forEach((r, i) => {
     const p = bedPose(r)
     d.x[i] = p.x
+    d.y[i] = levelY(r.level)
     d.z[i] = p.z
     d.rot[i] = p.rot
   })
 
 /**
-  Every bed with the furniture beside it, and a patient under a blanket in
-  the occupied ones. The blanket's colour is the patient's acuity.
+  Every bed in the hospital with the furniture beside it, and a patient
+  under a blanket in the occupied ones. The blanket's colour is the
+  patient's acuity.
 */
 export function Beds() {
   const models = useModels()
@@ -28,21 +32,30 @@ export function Beds() {
   const material = getMaterial()
   const day = useWard((s) => s.day)
   const t = useWard((s) => s.t)
+  const scope = useWard((s) => s.scope)
   const invalidate = useThree((s) => s.invalidate)
   const beds = useInstanceData(n, place)
   const kits = useInstanceData(n, place)
   const people = useInstanceData(n, place)
 
   useLayoutEffect(() => {
+    for (const d of [beds.current, kits.current]) {
+      BED_ROOMS.forEach((r, i) => (d.show[i] = shows(scope, r.wing) ? 1 : 0))
+      d.version++
+    }
+    invalidate()
+  }, [scope, beds, kits, invalidate])
+
+  useLayoutEffect(() => {
     const d = people.current
     BED_ROOMS.forEach((r, i) => {
-      const s = day ? bedAt(day, r.id, t) : undefined
+      const s = shows(scope, r.wing) && day ? bedAt(day, r.id, t) : undefined
       d.show[i] = s?.state === 'occupied' ? 1 : 0
       d.color[i].set(ACUITY[s?.acuity ?? 0])
     })
     d.version++
     invalidate()
-  }, [day, t, invalidate, people])
+  }, [day, t, scope, invalidate, people])
 
   return (
     <group>

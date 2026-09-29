@@ -1,5 +1,5 @@
-import { BED_ROOMS, ROOM_BY_ID } from '../data/floorplan'
-import type { Asset, AssetSpan, BedSpan, BedState, Day } from '../data/types'
+import { BED_ROOMS, ROOM_BY_ID, wingOfAsset } from '../data/floorplan'
+import type { Alert, Asset, AssetSpan, BedSpan, BedState, Day, Room } from '../data/types'
 import { DAY_MIN, STEP } from '../sim/time'
 
 export const clock = (m: number) => {
@@ -47,9 +47,10 @@ export function activeCall(day: Day, roomId: string, m: number) {
   return day.calls.find((c) => c.room === roomId && m >= c.at && m < c.at + c.wait)
 }
 
-export function census(day: Day, m: number) {
+/** Beds by state at minute m, across the hospital or in the rooms given. */
+export function census(day: Day, m: number, beds: Room[] = BED_ROOMS) {
   const counts: Record<BedState, number> = { occupied: 0, dirty: 0, cleaning: 0, ready: 0, blocked: 0 }
-  for (const r of BED_ROOMS) {
+  for (const r of beds) {
     const s = bedAt(day, r.id, m)
     if (s) counts[s.state]++
   }
@@ -61,6 +62,9 @@ export function assetsIn(day: Day, roomId: string, m: number) {
 }
 
 export const roomName = (id: string) => ROOM_BY_ID[id]?.name ?? id
+
+/** The wing an alert belongs to: its room's, or its equipment's. */
+export const alertWing = (alert: Alert) => (alert.target.type === 'room' ? ROOM_BY_ID[alert.target.id]?.wing : wingOfAsset(alert.target.id))
 
 export const BED_LABEL: Record<BedState, string> = {
   occupied: 'Occupied',

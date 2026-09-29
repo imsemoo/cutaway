@@ -1,4 +1,4 @@
-import { ROOMS } from '../data/floorplan'
+import { ROOMS, ROOM_BY_ID } from '../data/floorplan'
 import type { Alert, Asset, Day, RoomDay } from '../data/types'
 import { DAY_MIN, STEP } from '../sim/time'
 import type { Stamped, WardEvent } from './protocol'
@@ -56,29 +56,65 @@ export function emptyDay(seed: number): Day {
   return { seed, rooms, calls: [], assets: [], alerts: [] }
 }
 
-/** Folds events into a new day. The day passed in is never changed, and whatever a batch does not touch is shared with it. */
+/**
+  Folds events into a new day. The day passed in is never changed: a batch
+  copies each array it touches once, the first time it touches it, and
+  shares everything else. Equipment, calls and alerts are found through
+  maps built for the batch, since a hospital's day holds thousands of each.
+*/
 export function applyEvents(day: Day, events: Stamped[]): Day {
   const rooms = { ...day.rooms }
   const assets = [...day.assets]
   const calls = [...day.calls]
   const alerts = [...day.alerts]
-  const copied = new Set<RoomDay | Asset>()
+  const fresh = new Set<unknown[]>()
+  const own = <T,>(list: T[]): T[] => {
+    if (fresh.has(list)) return list
+    const copy = list.slice()
+    fresh.add(copy)
+    return copy
+  }
 
-  const room = (id: string) => {
+  const spansOf = (id: string) => {
     const r = rooms[id]
-    if (!r || copied.has(r)) return r
-    const copy = (rooms[id] = { spans: [...r.spans], temp: [...r.temp], co2: [...r.co2] })
-    copied.add(copy)
-    return copy
+    if (!r) return undefined
+    if (!fresh.has(r.spans)) rooms[id] = { ...r, spans: own(r.spans) }
+    return rooms[id].spans
   }
-  const asset = (id: string) => {
-    const i = assets.findIndex((a) => a.id === id)
-    if (i < 0 || copied.has(assets[i])) return assets[i]
+  const readingsOf = (id: string) => {
+    const r = rooms[id]
+    if (!r) return undefined
+    if (!fresh.has(r.temp)) rooms[id] = { ...r, temp: own(r.temp), co2: own(r.co2) }
+    return rooms[id]
+  }
+
+  let assetIndex: Map<string, number> | undefined
+  const indexOf = (id: string) => (assetIndex ??= new Map(assets.map((a, i) => [a.id, i]))).get(id)
+  const assetSpansOf = (id: string) => {
+    const i = indexOf(id)
+    if (i === undefined) return undefined
     const a = assets[i]
-    const copy = (assets[i] = { ...a, spans: [...a.spans], ...(a.battery && { battery: [...a.battery] }) })
-    copied.add(copy)
-    return copy
+    if (!fresh.has(a.spans)) assets[i] = { ...a, spans: own(a.spans) }
+    return assets[i].spans
   }
+  const batteryOf = (id: string) => {
+    const i = indexOf(id)
+    const a = i === undefined ? undefined : assets[i]
+    if (!a?.battery) return undefined
+    if (!fresh.has(a.battery)) assets[i!] = { ...a, battery: own(a.battery) }
+    return assets[i!].battery
+  }
+
+  // First match wins, as a search from the start would.
+  const firstIndex = <T,>(list: T[], key: (x: T) => string) => {
+    const map = new Map<string, number>()
+    list.forEach((x, i) => map.has(key(x)) || map.set(key(x), i))
+    return map
+  }
+  const callKey = (c: { room: string; at: number }) => `${c.room}|${c.at}`
+  let callIndex: Map<string, number> | undefined
+  let alertIndex: Map<string, number> | undefined
+
   const end = <T extends { to: number }>(list: T[], at: number) => {
     const last = list[list.length - 1]
     if (last?.to === Infinity) list[list.length - 1] = { ...last, to: at }
@@ -87,49 +123,56 @@ export function applyEvents(day: Day, events: Stamped[]): Day {
   for (const e of events) {
     switch (e.kind) {
       case 'bed': {
-        const r = room(e.room)
-        if (!r) break
-        end(r.spans, e.at)
-        r.spans.push({ from: e.at, to: Infinity, state: e.state, acuity: e.acuity, note: e.note })
+        const spans = spansOf(e.room)
+        if (!spans) break
+        end(spans, e.at)
+        spans.push({ from: e.at, to: Infinity, state: e.state, acuity: e.acuity, note: e.note })
         break
       }
       case 'asset': {
-        let a = asset(e.id)
-        if (!a) {
-          a = { id: e.id, kind: e.assetKind, spans: [], ...(e.assetKind === 'pump' && { battery: [] }) }
+        let spans = assetSpansOf(e.id)
+        if (!spans) {
+          // Equipment never leaves its wing, so the first room it is seen in names it.
+          const a: Asset = { id: e.id, kind: e.assetKind, wing: ROOM_BY_ID[e.loc]?.wing ?? '', spans: [], ...(e.assetKind === 'pump' && { battery: [] }) }
           assets.push(a)
-          copied.add(a)
+          assetIndex?.set(a.id, assets.length - 1)
+          fresh.add(a.spans)
+          if (a.battery) fresh.add(a.battery)
+          spans = a.spans
         }
-        end(a.spans, e.at)
-        a.spans.push({ from: e.at, to: Infinity, loc: e.loc, status: e.status })
+        end(spans, e.at)
+        spans.push({ from: e.at, to: Infinity, loc: e.loc, status: e.status })
         break
       }
       case 'readings':
         for (const id in e.temp) {
-          const r = room(id)
+          const r = readingsOf(id)
           if (!r) continue
           r.temp[e.slot] = e.temp[id]
           r.co2[e.slot] = e.co2[id]
         }
         for (const id in e.battery) {
-          const a = asset(id)
-          if (a?.battery) a.battery[e.slot] = e.battery[id]
+          const battery = batteryOf(id)
+          if (battery) battery[e.slot] = e.battery[id]
         }
         break
       case 'call':
         if (e.on) {
           calls.push({ room: e.room, at: e.pressed, wait: Infinity })
+          const key = callKey({ room: e.room, at: e.pressed })
+          if (callIndex && !callIndex.has(key)) callIndex.set(key, calls.length - 1)
         } else {
-          const i = calls.findIndex((c) => c.room === e.room && c.at === e.pressed)
-          if (i >= 0) calls[i] = { ...calls[i], wait: e.at - e.pressed }
+          const i = (callIndex ??= firstIndex(calls, callKey)).get(callKey({ room: e.room, at: e.pressed }))
+          if (i !== undefined) calls[i] = { ...calls[i], wait: e.at - e.pressed }
         }
         break
       case 'alert-open':
         alerts.push({ ...e.alert, to: Infinity } satisfies Alert)
+        if (alertIndex && !alertIndex.has(e.alert.id)) alertIndex.set(e.alert.id, alerts.length - 1)
         break
       case 'alert-close': {
-        const i = alerts.findIndex((a) => a.id === e.id)
-        if (i >= 0) alerts[i] = { ...alerts[i], to: e.at }
+        const i = (alertIndex ??= firstIndex(alerts, (a) => a.id)).get(e.id)
+        if (i !== undefined) alerts[i] = { ...alerts[i], to: e.at }
         break
       }
     }

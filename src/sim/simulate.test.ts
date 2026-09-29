@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest'
-import { BED_ROOMS, ROOMS } from '../data/floorplan'
+import { BED_ROOMS, ROOMS, ROOM_BY_ID, STORY, WINGS, WING_BY_CODE } from '../data/floorplan'
 import type { Day } from '../data/types'
-import { activeAlerts, assetAt, bedAt, census } from '../lib/query'
+import { activeAlerts, alertWing, assetAt, bedAt, census } from '../lib/query'
 import { DEFAULT_TIME } from '../state/store'
 import { simulate } from './simulate'
 import { DAY_MIN, SAMPLES } from './time'
@@ -66,6 +66,17 @@ describe('the simulated day', () => {
     }
   })
 
+  it('tracks more than three thousand pieces of equipment, each only ever inside its own wing', () => {
+    expect(day.assets.length).toBeGreaterThan(3000)
+    expect(new Set(day.assets.map((a) => a.id)).size).toBe(day.assets.length)
+    for (const a of day.assets) for (const s of a.spans) expect(ROOM_BY_ID[s.loc].wing, `${a.id} in ${s.loc}`).toBe(a.wing)
+  })
+
+  it('gives every wing a day of its own', () => {
+    const at = (code: string) => JSON.stringify(census(day, 14 * 60 + 30, WING_BY_CODE[code].beds))
+    expect(new Set(WINGS.map((w) => at(w.code))).size).toBeGreaterThan(10)
+  })
+
   it('only uses equipment in a patient room, and never in an empty bed', () => {
     for (let m = 0; m < DAY_MIN; m += 15) {
       for (const a of day.assets) {
@@ -78,17 +89,18 @@ describe('the simulated day', () => {
   })
 })
 
-describe('the story at 14:30, which the case study describes', () => {
+describe('the story at 14:30 on level 4, A wing, which the case study describes', () => {
   it('opens on the default minute', () => {
     expect(DEFAULT_TIME).toBe(14 * 60 + 30)
   })
 
   it('has 20 of 28 beds occupied', () => {
-    expect(census(day, DEFAULT_TIME)).toEqual({ occupied: 20, ready: 4, cleaning: 1, dirty: 2, blocked: 1 })
+    expect(census(day, DEFAULT_TIME, WING_BY_CODE[STORY].beds)).toEqual({ occupied: 20, ready: 4, cleaning: 1, dirty: 2, blocked: 1 })
   })
 
   it('has four open alerts: a pump battery, a warm room, a dirty bed and a call light', () => {
     const kinds = activeAlerts(day, DEFAULT_TIME)
+      .filter((a) => alertWing(a) === STORY)
       .map((a) => a.kind)
       .sort()
     expect(kinds).toEqual(['battery', 'call', 'dirty', 'temp'])

@@ -1,9 +1,12 @@
 import { create } from 'zustand'
-import { ROOM_BY_ID } from '../data/floorplan'
+import { ROOMS, ROOM_BY_ID, STORY, WING_BY_CODE, wingOfAsset } from '../data/floorplan'
+
+const ROOM_COUNT = ROOMS.length
 import type { Day, Layer, Selection, View } from '../data/types'
 import { applyEvents, emptyDay } from '../live/events'
 import type { FeedStatus } from '../live/feed'
 import type { Stamped } from '../live/protocol'
+import { isWing, scopeFromParam, scopeToParam, type Scope } from './scope'
 import { SEED } from '../sim/simulate'
 
 export const DEFAULT_TIME = 14 * 60 + 30
@@ -16,6 +19,8 @@ interface WardState {
   /** The day the views read: the recorded one in replay, the one the feed builds in live. */
   day: Day | null
   recorded: Day | null
+  /** Whether the recorded day covers every wing yet: the one the page opens on arrives first. */
+  complete: boolean
   simMs: number
   t: number
   /** Where the replay stood when live took over, to return to. */
@@ -26,10 +31,11 @@ interface WardState {
   speed: (typeof SPEEDS)[number]
   view: View
   layer: Layer
+  scope: Scope
   selection: Selection | null
   hover: string | null
   resetKey: number
-  setDay: (day: Day, ms: number) => void
+  setDay: (day: Day, ms: number, complete: boolean) => void
   setMode: (mode: Mode) => void
   setFeed: (feed: FeedStatus) => void
   applyFeed: (events: Stamped[], reset: boolean, at: number) => void
@@ -39,15 +45,19 @@ interface WardState {
   setSpeed: (s: (typeof SPEEDS)[number]) => void
   setView: (v: View) => void
   setLayer: (l: Layer) => void
+  setScope: (scope: Scope) => void
   select: (s: Selection | null) => void
   setHover: (id: string | null) => void
 }
 
 const VIEWS: View[] = ['3d', 'plan', 'list']
 const LAYERS: Layer[] = ['beds', 'temp', 'air', 'calls']
-const ASSET_ID = /^(IVP|VEN|WCH|PXR|BSC)-\d{2}$/
+const ASSET_ID = /^(IVP|VEN|WCH|PXR|BSC)-(\d[A-Z]-)?\d{2}$/
 
-/** A shared link opens the same view: ?view=plan&layer=air&t=18:00&select=FAM, or ?mode=live */
+/** The wing a selection lives in. */
+export const selectionWing = (s: Selection) => (s.type === 'room' ? ROOM_BY_ID[s.id]?.wing : wingOfAsset(s.id)) ?? STORY
+
+/** A shared link opens the same view: ?view=plan&layer=air&t=18:00&select=FAM, ?at=level-4, or ?mode=live */
 function fromUrl() {
   const q = new URLSearchParams(typeof location === 'undefined' ? '' : location.search)
   const view = VIEWS.find((v) => v === q.get('view')) ?? '3d'
@@ -56,41 +66,51 @@ function fromUrl() {
   const t = hhmm ? Math.min(1439, Number(hhmm[1]) * 60 + Number(hhmm[2])) : DEFAULT_TIME
   const id = (q.get('select') ?? '').toUpperCase()
   const selection: Selection | null = ROOM_BY_ID[id] ? { type: 'room', id } : ASSET_ID.test(id) ? { type: 'asset', id } : null
+  const scope: Scope = selection ? selectionWing(selection) : (scopeFromParam(q.get('at') ?? '') ?? STORY)
   const mode: Mode = q.get('mode') === 'live' ? 'live' : 'replay'
   const feed: FeedStatus = mode === 'live' ? { state: 'connecting', attempt: 0 } : { state: 'closed' }
-  return { view, layer, t, replayT: t, selection, mode, feed }
+  return { view, layer, t, replayT: t, scope, selection, mode, feed }
 }
 
 export const useWard = create<WardState>((set) => ({
   day: null,
   recorded: null,
+  complete: false,
   simMs: 0,
   playing: false,
   speed: 15,
   ...fromUrl(),
   hover: null,
   resetKey: 0,
-  setDay: (day, simMs) => set((s) => ({ recorded: day, simMs, ...(s.mode === 'replay' && { day }) })),
+  setDay: (day, simMs, complete) => set((s) => ({ recorded: day, simMs, ...(s.mode === 'replay' && { day, complete }) })),
   setMode: (mode) =>
     set((s) => {
       if (mode === s.mode) return {}
       return mode === 'live'
-        ? { mode, day: null, playing: false, replayT: s.t, feed: { state: 'connecting', attempt: 0 } }
-        : { mode, day: s.recorded, t: s.replayT, feed: { state: 'closed' } }
+        ? { mode, day: null, complete: false, playing: false, replayT: s.t, feed: { state: 'connecting', attempt: 0 } }
+        : { mode, day: s.recorded, complete: s.recorded ? Object.keys(s.recorded.rooms).length === ROOM_COUNT : false, t: s.replayT, feed: { state: 'closed' } }
     }),
   setFeed: (feed) => set({ feed }),
   // The feed closes after the switch back to replay has rendered, so a last frame of it can still arrive; it is dropped.
   applyFeed: (events, reset, at) =>
-    set((s) => (s.mode === 'live' ? { day: applyEvents(reset || !s.day ? emptyDay(SEED) : s.day, events), t: Math.min(1439, at) } : {})),
+    // A live day holds every wing from its first sync.
+    set((s) => (s.mode === 'live' ? { day: applyEvents(reset || !s.day ? emptyDay(SEED) : s.day, events), complete: true, t: Math.min(1439, at) } : {})),
   resetView: () => set((s) => ({ selection: null, resetKey: s.resetKey + 1 })),
   setT: (t) => set({ t: Math.max(0, Math.min(1439, t)) }),
   setPlaying: (playing) => set({ playing }),
   setSpeed: (speed) => set({ speed }),
   setView: (view) => set({ view }),
   setLayer: (layer) => set({ layer }),
-  select: (selection) => set({ selection }),
+  // Leaving a wing leaves its selection behind.
+  setScope: (scope) => set((s) => (scope === s.scope ? {} : { scope, selection: null, hover: null })),
+  // Picking something anywhere goes to its wing.
+  select: (selection) => set(selection ? { selection, scope: selectionWing(selection) } : { selection }),
   setHover: (hover) => set({ hover }),
 }))
+
+/** Whether the day in hand covers what the scope shows: its wing, or, for a level or the hospital, every wing. */
+export const covers = (s: WardState) =>
+  s.day !== null && (isWing(s.scope) ? s.day.rooms[WING_BY_CODE[s.scope].rooms[0].id] !== undefined : s.complete)
 
 /** Keep the address bar in step, so any view can be copied and shared. */
 export function syncUrl() {
@@ -107,6 +127,8 @@ export function syncUrl() {
     set('mode', live ? 'live' : null)
     set('view', s.view === '3d' ? null : s.view)
     set('layer', s.layer === 'beds' ? null : s.layer)
+    // A selection names its wing already.
+    set('at', s.selection || s.scope === STORY ? null : scopeToParam(s.scope))
     // Live time is the feed's, so a live link carries no time.
     set('t', live || Math.round(s.t) === DEFAULT_TIME ? null : clock(s.t))
     set('select', s.selection?.id ?? null)

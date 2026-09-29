@@ -29,7 +29,7 @@ The first asks for the day so far. The second resumes: the page holds day 1 up t
 ```
 
 - With `reset: false`, `events` are exactly the ones after `after`.
-- With `reset: true`, they are the whole day so far, and the page starts the day over. The server resets a new page, a page on another day, and a page that missed more than it keeps (the last 300 events).
+- With `reset: true`, they are the whole day so far, and the page starts the day over. The server resets a new page, a page on another day, and a page that missed more than it keeps (the last 2,000 events, about a minute of the whole hospital).
 
 **`event`** is one event, as it happens.
 

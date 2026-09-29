@@ -116,3 +116,44 @@ test('live mode streams the day, and catches up after the server goes down', asy
   await expect(page.locator('.alert')).toHaveCount(4)
   await expect(page).not.toHaveURL(/mode=live/)
 })
+
+test('the whole hospital: six levels, and any wing one click away', async ({ page }) => {
+  await page.goto('/')
+  await expect(page.locator('.alert')).toHaveCount(4)
+  // The building map on a wide screen, the panel's button on a phone.
+  await page.getByRole('button', { name: /^(All levels|The whole hospital)$/ }).filter({ visible: true }).first().click()
+  await expect(page).toHaveURL(/at=hospital/)
+  await expect(page.locator('.brand__where')).toContainText('36 wings')
+  await expect(page.locator('.levels__row')).toHaveCount(6)
+  await expect(page.getByText(/of 1,008 occupied/)).toBeVisible()
+
+  await page.getByRole('button', { name: /^Level 6, R wing:/ }).filter({ visible: true }).first().click()
+  await expect(page).toHaveURL(/at=6r/)
+  await expect(page.locator('.brand__where')).toContainText('Level 6, R wing')
+  await expect(page.locator('.board__cell')).toHaveCount(28)
+
+  await page.getByRole('radio', { name: 'List' }).click()
+  await expect(page.locator('.rooms tbody tr')).toHaveCount(38)
+})
+
+test('a link to the hospital view lists every wing', async ({ page }) => {
+  await page.goto('/?at=hospital&view=list')
+  await expect(page.locator('.rooms tbody tr')).toHaveCount(36)
+  await page.locator('.rooms').getByRole('button', { name: 'Level 2, K wing' }).click()
+  await expect(page).toHaveURL(/at=2k/)
+  await expect(page.locator('.rooms tbody tr')).toHaveCount(38)
+})
+
+test('a level shows its six wings, and the trail leads back up', async ({ page }) => {
+  await page.goto('/?at=level-4')
+  await expect(page.locator('.brand__where')).toContainText('Level 4 · six wings, 168 beds')
+  await expect(page.locator('.levels__wings--level .chip')).toHaveCount(6)
+  await page.getByRole('button', { name: /^Level 4, D wing:/ }).filter({ visible: true }).first().click()
+  await expect(page).toHaveURL(/at=4d/)
+  await expect(page.locator('.board__cell')).toHaveCount(28)
+  const trail = page.getByRole('navigation', { name: 'Where you are' })
+  await trail.getByRole('button', { name: 'Level 4' }).click()
+  await expect(page).toHaveURL(/at=level-4/)
+  await trail.getByRole('button', { name: 'Hospital' }).click()
+  await expect(page).toHaveURL(/at=hospital/)
+})

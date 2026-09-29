@@ -1,9 +1,11 @@
 import { useLayoutEffect, useRef } from 'react'
-import { ROOM_BY_ID, center } from '../data/floorplan'
+import { LEVELS, PLATE, ROOM_BY_ID, WING, center } from '../data/floorplan'
 import type { Day, Layer } from '../data/types'
 import { BED } from '../lib/colors'
 import { ASSET_LABEL, ASSET_STATUS_LABEL, BED_LABEL, activeCall, assetAt, bedAt, sample } from '../lib/query'
 import { assetPositions } from '../lib/positions'
+import { RIM, levelY } from '../scene/layout'
+import { HOSPITAL, levelScope, scopeLevel, scopeWings } from '../state/scope'
 import { setAnchor } from '../scene/tags'
 import { useWard } from '../state/store'
 
@@ -15,6 +17,7 @@ export function Tags() {
   const selection = useWard((s) => s.selection)
   const layer = useWard((s) => s.layer)
   const view = useWard((s) => s.view)
+  const scope = useWard((s) => s.scope)
   if (!day || view === 'list') return null
   const plan = view === 'plan'
   const selRoom = selection?.type === 'room' ? selection.id : undefined
@@ -23,10 +26,25 @@ export function Tags() {
 
   return (
     <div className="tags" aria-hidden="true">
+      {scopeLevel(scope) &&
+        scopeWings(levelScope(scopeLevel(scope)!)).map((w) => (
+          <Tag key={`wing-${w.code}`} slot={`wing-${w.code}`} x={w.x + WING.w / 2} y={levelY(w.level) + 3.2} z={w.z} quiet>
+            <span className="tag__id">
+              {w.code}
+              <span className="tag__more"> wing</span>
+            </span>
+          </Tag>
+        ))}
+      {scope === HOSPITAL &&
+        LEVELS.map((level) => (
+          <Tag key={`level-${level}`} slot={`level-${level}`} x={-RIM} y={levelY(level)} z={PLATE.d + RIM} quiet>
+            <span className="tag__id">Level {level}</span>
+          </Tag>
+        ))}
       {selRoom && <RoomTag key="sel" slot="sel" id={selRoom} day={day} t={t} layer={layer} plan={plan} strong />}
       {hover && hover !== selRoom && <RoomTag key="hover" slot="hover" id={hover} day={day} t={t} layer={layer} plan={plan} />}
       {selAsset && assetPos && (
-        <Tag slot="asset" x={assetPos.x} y={plan ? 0.5 : 2.4} z={assetPos.z} strong>
+        <Tag slot="asset" x={assetPos.x} y={levelY(ROOM_BY_ID[assetAt(selAsset, t).loc].level) + (plan ? 0.5 : 2.4)} z={assetPos.z} strong>
           <span className="tag__id">{selAsset.id}</span>
           <span className="tag__meta">
             {ASSET_LABEL[selAsset.kind]}, {ASSET_STATUS_LABEL[assetAt(selAsset, t).status].toLowerCase()}
@@ -58,7 +76,7 @@ function RoomTag({ slot, id, day, t, layer, plan, strong }: { slot: string; id: 
             ? BED_LABEL[bed.state]
             : r.kind === 'station' ? 'Staff area' : 'Support space'
   return (
-    <Tag slot={slot} x={c.x} y={plan ? 0.5 : 3.1} z={c.z} strong={strong}>
+    <Tag slot={slot} x={c.x} y={levelY(r.level) + (plan ? 0.5 : 3.1)} z={c.z} strong={strong}>
       <span className="tag__id">{isBed ? r.id : r.name}</span>
       <span className="tag__meta">
         {layer === 'beds' && bed && <i className="tag__dot" style={{ background: BED[bed.state].strong }} />}
@@ -68,14 +86,14 @@ function RoomTag({ slot, id, day, t, layer, plan, strong }: { slot: string; id: 
   )
 }
 
-function Tag({ slot, x, y, z, strong, children }: { slot: string; x: number; y: number; z: number; strong?: boolean; children: React.ReactNode }) {
+function Tag({ slot, x, y, z, strong, quiet, children }: { slot: string; x: number; y: number; z: number; strong?: boolean; quiet?: boolean; children: React.ReactNode }) {
   const el = useRef<HTMLDivElement>(null)
   useLayoutEffect(() => {
     if (el.current) setAnchor(slot, { el: el.current, x, y, z })
   }, [slot, x, y, z])
   useLayoutEffect(() => () => setAnchor(slot, null), [slot])
   return (
-    <div ref={el} className={`tag${strong ? ' tag--strong' : ''}`} style={{ visibility: 'hidden' }}>
+    <div ref={el} className={`tag${strong ? ' tag--strong' : ''}${quiet ? ' tag--quiet' : ''}`} style={{ visibility: 'hidden' }}>
       {children}
     </div>
   )

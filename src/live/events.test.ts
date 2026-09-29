@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest'
-import { BED_ROOMS, ROOMS } from '../data/floorplan'
+import { STORY, WING_BY_CODE } from '../data/floorplan'
 import type { Day } from '../data/types'
-import { activeAlerts, activeCall, assetAt, batteryAt, bedAt, census, sample } from '../lib/query'
+import { activeAlerts, activeCall, alertWing, assetAt, batteryAt, bedAt, census, sample } from '../lib/query'
 import { simulate } from '../sim/simulate'
 import { DAY_MIN, STEP } from '../sim/time'
 import { DEFAULT_TIME } from '../state/store'
@@ -11,18 +11,24 @@ const day = simulate()
 const log = toEvents(day)
 const upTo = (m: number) => applyEvents(emptyDay(day.seed), log.filter((e) => e.at <= m))
 
-/** What the views read about a day at minute m. */
+// The fold runs over the whole hospital; the readings compared are the story wing's and two others', one low and one high.
+const SAMPLE = [STORY, '1D', '6R'].map((code) => WING_BY_CODE[code])
+
+/** What the views read about a day at minute m, in the sampled wings. */
 function reading(d: Day, m: number) {
+  const wings = new Set(SAMPLE.map((w) => w.code))
   return {
-    beds: BED_ROOMS.map((r) => {
+    beds: SAMPLE.flatMap((w) => w.beds).map((r) => {
       const s = bedAt(d, r.id, m)
       return [r.id, s?.state, s?.acuity, s?.from, Boolean(activeCall(d, r.id, m))]
     }),
-    air: ROOMS.map((r) => [r.id, sample(d.rooms[r.id].temp, m), sample(d.rooms[r.id].co2, m)]),
-    assets: [...d.assets]
+    air: SAMPLE.flatMap((w) => w.rooms).map((r) => [r.id, sample(d.rooms[r.id].temp, m), sample(d.rooms[r.id].co2, m)]),
+    assets: d.assets
+      .filter((a) => wings.has(a.wing))
       .sort((a, b) => a.id.localeCompare(b.id))
       .map((a) => [a.id, assetAt(a, m).loc, assetAt(a, m).status, batteryAt(a, m)]),
     alerts: activeAlerts(d, m)
+      .filter((a) => wings.has(alertWing(a) ?? ''))
       .map((a) => a.id)
       .sort(),
   }
@@ -45,11 +51,13 @@ describe('the live feed', () => {
       live = applyEvents(live, batch)
       expect(reading(live, m), `at ${m}`).toEqual(reading(day, m))
     }
-  })
+    // 288 batches, each copying every room's readings: the slow path on purpose.
+  }, 30_000)
 
   it('tells the 14:30 story from one sync of the day so far', () => {
     const live = upTo(DEFAULT_TIME)
-    expect(census(live, DEFAULT_TIME)).toEqual({ occupied: 20, ready: 4, cleaning: 1, dirty: 2, blocked: 1 })
+    expect(census(live, DEFAULT_TIME, WING_BY_CODE[STORY].beds)).toEqual({ occupied: 20, ready: 4, cleaning: 1, dirty: 2, blocked: 1 })
+    expect(census(live, DEFAULT_TIME)).toEqual(census(day, DEFAULT_TIME))
     expect(reading(live, DEFAULT_TIME)).toEqual(reading(day, DEFAULT_TIME))
   })
 

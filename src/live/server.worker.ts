@@ -18,7 +18,8 @@ import type { ClientMessage, ServerMessage, Stamped } from './protocol'
 type Pipe = { op: 'boot'; start: number } | { op: 'outage'; ms: number } | { op: 'open' | 'close'; conn: number } | { op: 'send'; conn: number; text: string }
 
 const RATE = 1 // simulated minutes per second
-const KEEP = 300 // how many recent events a returning subscriber can catch up on
+// How many recent events a returning subscriber can catch up on: about a minute of the whole hospital.
+const KEEP = 2000
 
 let day = 0
 let log: Stamped[] = []

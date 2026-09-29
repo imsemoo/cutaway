@@ -1,6 +1,6 @@
 import { BoxGeometry, BufferGeometry, CylinderGeometry, SphereGeometry, TorusGeometry } from 'three'
 import { mergeGeometries } from 'three/examples/jsm/utils/BufferGeometryUtils.js'
-import { FLOOR, ROOMS } from '../data/floorplan'
+import { STOREY, STORY, WING, WING_BY_CODE } from '../data/floorplan'
 import type { AssetKind, Room, Side } from '../data/types'
 
 export const WALL_T = 0.14
@@ -37,22 +37,29 @@ function side(r: Room, s: Side, h: number, out: BufferGeometry[]) {
   }
 }
 
+/**
+  One wing's shell in the wing's own coordinates. Every wing in the tower
+  is built to the same plan, so the whole hospital draws it as instances:
+  one draw call per part for all 36 wings.
+*/
 export function buildShell() {
   const walls: BufferGeometry[] = []
   const low: BufferGeometry[] = []
   const glass: BufferGeometry[] = []
   const fixtures: BufferGeometry[] = []
-  const H = FLOOR.wallHeight
+  const H = STOREY.wallHeight
+  const template = WING_BY_CODE[STORY]
 
-  for (const r of ROOMS) {
+  for (const room of template.rooms) {
+    const r = { ...room, x: room.x - template.x, z: room.z - template.z }
     for (const s of ['n', 's', 'w', 'e'] as Side[]) {
       if (r.glass === s) side(r, s, H, glass)
-      else side(r, s, r.low ? FLOOR.lowHeight : H, r.low ? low : walls)
+      else side(r, s, r.low ? STOREY.lowHeight : H, r.low ? low : walls)
     }
   }
 
   // Glazed ends of both corridors.
-  for (const x of [WALL_T / 2, FLOOR.w - WALL_T / 2]) {
+  for (const x of [WALL_T / 2, WING.w - WALL_T / 2]) {
     glass.push(box(WALL_T, H, 3, x, H / 2, 9))
     glass.push(box(WALL_T, H, 3, x, H / 2, 17))
   }

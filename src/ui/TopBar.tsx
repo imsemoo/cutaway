@@ -1,8 +1,9 @@
 import { Box, List, Map as MapIcon, Search as SearchIcon } from 'lucide-react'
 import { useMemo, useRef, useState, type KeyboardEvent } from 'react'
-import { ROOMS } from '../data/floorplan'
+import { BED_ROOMS, ROOMS, WINGS, WING_BY_CODE, isBed, wingName } from '../data/floorplan'
 import type { View } from '../data/types'
 import { ASSET_LABEL } from '../lib/query'
+import { HOSPITAL, scopeLevel, scopeWings } from '../state/scope'
 import { useWard } from '../state/store'
 
 const VIEWS: { id: View; label: string; icon: typeof Box }[] = [
@@ -14,6 +15,14 @@ const VIEWS: { id: View; label: string; icon: typeof Box }[] = [
 export function TopBar() {
   const view = useWard((s) => s.view)
   const setView = useWard((s) => s.setView)
+  const scope = useWard((s) => s.scope)
+  const level = scopeLevel(scope)
+  const where =
+    scope === HOSPITAL
+      ? `Whole hospital · ${WINGS.length} wings, ${BED_ROOMS.length.toLocaleString('en-US')} beds`
+      : level
+        ? `Level ${level} · six wings, ${scopeWings(scope).reduce((n, w) => n + w.beds.length, 0)} beds`
+        : `${wingName(WING_BY_CODE[scope])} · two wards and an ICU`
   return (
     <header className="bar">
       <div className="brand">
@@ -25,7 +34,7 @@ export function TopBar() {
         </svg>
         <div className="brand__text">
           <span className="brand__name">Ward Twin</span>
-          <span className="brand__where">Level 4 · Medical–surgical ward and ICU</span>
+          <span className="brand__where">{where}</span>
         </div>
       </div>
       <Search />
@@ -55,8 +64,9 @@ function Search() {
   const input = useRef<HTMLInputElement>(null)
 
   const all = useMemo<Hit[]>(() => {
-    const rooms: Hit[] = ROOMS.map((r) => ({ type: 'room', id: r.id, label: r.kind === 'patient' || r.kind === 'icu' ? r.id : r.name, hint: r.kind === 'patient' || r.kind === 'icu' ? r.name : 'Room' }))
-    const assets: Hit[] = (day?.assets ?? []).map((a) => ({ type: 'asset', id: a.id, label: a.id, hint: ASSET_LABEL[a.kind] }))
+    // Every wing has its lounge and its store, so the hint names the wing.
+    const rooms: Hit[] = ROOMS.map((r) => ({ type: 'room', id: r.id, label: isBed(r) ? r.id : r.name, hint: isBed(r) ? r.name : wingName(WING_BY_CODE[r.wing]) }))
+    const assets: Hit[] = (day?.assets ?? []).map((a) => ({ type: 'asset', id: a.id, label: a.id, hint: `${ASSET_LABEL[a.kind]} · ${a.wing}` }))
     return [...rooms, ...assets]
   }, [day])
 

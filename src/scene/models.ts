@@ -80,8 +80,18 @@ function paint(g: BufferGeometry, hex: number, tint: boolean) {
 }
 
 let proxies: Partial<Models> | null = null
+let boxes: Record<AssetKind, BufferGeometry> | null = null
 let material: MeshStandardMaterial | null = null
 export const getProxies = () => (proxies ??= makeProxies())
+/** At the distance of the hospital view equipment is a few pixels: a box each, twelve triangles, still in its status colour. */
+export const getBoxes = () =>
+  (boxes ??= {
+    pump: paint(new BoxGeometry(0.3, 1.5, 0.3).translate(0, 0.75, 0), 0xffffff, true),
+    vent: paint(new BoxGeometry(0.55, 1.2, 0.5).translate(0, 0.6, 0), 0xffffff, true),
+    chair: paint(new BoxGeometry(0.6, 0.9, 0.6).translate(0, 0.45, 0), 0xffffff, true),
+    xray: paint(new BoxGeometry(0.7, 2, 1).translate(0, 1, 0), 0xffffff, true),
+    scanner: paint(new BoxGeometry(0.3, 1.1, 0.3).translate(0, 0.55, 0), 0xffffff, true),
+  })
 export const getMaterial = () => (material ??= tintMaterial())
 
 function makeProxies(): Partial<Models> {
