@@ -76,6 +76,7 @@ A complete Arabic interface with a language switch, since a right-to-left digita
 
 ### 3.2 Architecture notes
 An architecture page and short decision records, plus a "making of" write-up with the measured before-and-after numbers.
+- Built: docs/architecture.md with a diagram of the data flow and a map of what loads when, nine decision records, and docs/making-of.md.
 
 ### 3.3 Embed API
 A `<ward-twin>` web component and a postMessage API, so a host dashboard can select rooms and listen to alerts.
@@ -96,4 +97,5 @@ A `<ward-twin>` web component and a postMessage API, so a host dashboard can sel
 - [x] 2.3 Wayfinding: the nearest free pump, wheelchair, scanner or ventilator from any bed, by walking time across wings, rows and lifts, drawn on the floors
 - [x] 2.4 Sensor heatmaps in a shader: corridors estimated in the fragment shader from the rooms' doors, with isolines and the alert limit; rooms keep their own readings
 - [x] 3.1 Arabic, right to left: the whole interface, the alerts and the floor labels, mirrored where Arabic reads that way; the first load stays at 90 kB
-- [ ] 3.2 to 3.4
+- [x] 3.2 Architecture notes: an architecture page, nine decision records, and a making-of with the numbers before and after each change
+- [ ] 3.3 and 3.4

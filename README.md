@@ -33,6 +33,8 @@ The full film, 40 seconds, goes on to the way to the nearest free pump, the whol
 
 ## How it is built
 
+The whole system on one page is in [docs/architecture.md](docs/architecture.md); the reasons behind it, in [nine short decision records](docs/decisions/README.md); and how it got here, with the numbers measured before and after each change, in [the making of](docs/making-of.md).
+
 - React 19, TypeScript, React Three Fiber, drei and three.js, bundled with Vite.
 - **The day is generated in a Web Worker** from a fixed seed, so the scene's first frame never waits on the simulation and every visitor replays the same day.
   - Each wing is simulated from its own seed, so one wing's day never shifts another's. Level 4's A wing keeps a scripted story on top; the others draw their discharges, admissions and faults at random.
