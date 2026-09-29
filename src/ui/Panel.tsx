@@ -1,5 +1,5 @@
 import { ArrowLeft, BatteryLow, BellRing, Building2, Info, OctagonAlert, Play, TriangleAlert, Unplug } from 'lucide-react'
-import { useState } from 'react'
+import { useLayoutEffect, useRef, useState } from 'react'
 import { BED_ROOMS, LEVELS, ROOMS, ROOM_BY_ID, STORY, WINGS, WING_BY_CODE, wingName, type Wing } from '../data/floorplan'
 import type { Alert, Asset, AssetKind, BedState, Day, Room, Severity } from '../data/types'
 import { describe, severityAt } from '../lib/alerts'
@@ -37,8 +37,16 @@ export function Panel() {
   const day = useWard((s) => s.day)
   const ready = useWard(covers)
   const selection = useWard((s) => s.selection)
+  const scope = useWard((s) => s.scope)
+  const aside = useRef<HTMLElement>(null)
+  // A new place opens at the top of its panel. A route widening the view keeps the room, and the reader's place in it.
+  const place = selection ? `${selection.type}:${selection.id}` : scope
+  useLayoutEffect(() => {
+    // A block, not an expression: scrollTo now returns a promise, which React would take for a cleanup.
+    aside.current?.scrollTo({ top: 0 })
+  }, [place])
   return (
-    <aside className="panel" aria-label="Details">
+    <aside ref={aside} className="panel" aria-label="Details">
       {!day || !ready ? (
         <PanelSkeleton />
       ) : selection?.type === 'room' ? (

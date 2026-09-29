@@ -158,6 +158,16 @@ test('a level shows its six wings, and the trail leads back up', async ({ page }
   await expect(page).toHaveURL(/at=hospital/)
 })
 
+test('a new place opens at the top of the panel, not where the last one was scrolled to', async ({ page }) => {
+  await page.goto('/')
+  await expect(page.locator('.alert')).toHaveCount(4)
+  const panel = page.locator('.panel')
+  await panel.evaluate((el) => el.scrollTo({ top: el.scrollHeight }))
+  await page.locator('.alert').last().click()
+  await expect(page.locator('.title')).toBeVisible()
+  await expect.poll(() => panel.evaluate((el) => el.scrollTop)).toBe(0)
+})
+
 test('finds the nearest free pump for a room and draws the way to it', async ({ page }) => {
   await page.goto('/?select=4A09')
   await expect(page.locator('.title')).toContainText('4A09')
