@@ -4,7 +4,7 @@ import { simulate } from './simulate'
 /*
   The day is generated off the main thread, so the first frame of the scene
   never waits on the simulation. The wing the page opens on comes first, in
-  a few milliseconds; the whole hospital follows once it is ready.
+  under 30 ms; the whole hospital follows, in under a second.
 */
 self.onmessage = (e: MessageEvent<{ seed: number; first?: string }>) => {
   const t0 = performance.now()

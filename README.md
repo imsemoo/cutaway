@@ -32,7 +32,7 @@ The full film, 40 seconds, goes on to the way to the nearest free pump, the whol
 - React 19, TypeScript, React Three Fiber, drei and three.js, bundled with Vite.
 - **The day is generated in a Web Worker** from a fixed seed, so the scene's first frame never waits on the simulation and every visitor replays the same day.
   - Each wing is simulated from its own seed, so one wing's day never shifts another's. Level 4's A wing keeps a scripted story on top; the others draw their discharges, admissions and faults at random.
-  - The wing on show arrives first, in a few milliseconds, and the whole hospital follows in under a second.
+  - The wing on show arrives first, in under 30 ms, and the whole hospital follows in under a second (measured at 25 to 29 ms and 0.6 to 0.75 s on the laptop below).
 - **One day, two sources.** Every view is a function of a day and a minute. Replay hands the views the recorded day. Live mode folds a stream of events into the same shape, where anything still going on (a bed's current state, a call light that is on, an open alert) ends at Infinity until an event closes it. No view needed to know which source it reads.
 - **A feed that stays whole.** Every event carries a sequence number.
   - A gap, four silent seconds or a dropped connection all end in a new subscribe that asks only for the missed events. The server sends the whole day so far when it no longer holds them.
