@@ -106,14 +106,17 @@ describe('the hospital plan', () => {
 
   it('never stands two pieces of equipment in the same spot', () => {
     const byId = new Map(day.assets.map((a) => [a.id, a]))
+    // Clashes are gathered and checked once: an expect per piece, 3,006 pieces at 48 minutes, ran past the timeout under load.
+    const clashes: string[] = []
     for (let m = 0; m < 1440; m += 30) {
       const seen = new Set<string>()
       for (const [id, p] of assetPositions(day, m)) {
         const level = ROOM_BY_ID[assetAt(byId.get(id)!, m).loc].level
         const key = `${level}:${p.x.toFixed(2)},${p.z.toFixed(2)}`
-        expect(seen.has(key), `${id} at ${key}, minute ${m}`).toBe(false)
+        if (seen.has(key)) clashes.push(`${id} at ${key}, minute ${m}`)
         seen.add(key)
       }
     }
+    expect(clashes).toEqual([])
   })
 })
