@@ -1,33 +1,45 @@
-import { Pause, Play } from 'lucide-react'
-import { useMemo } from 'react'
+import { History, Pause, Play, Radio } from 'lucide-react'
+import { useEffect, useMemo, useState } from 'react'
 import { SEVERITY } from '../lib/colors'
 import { clock } from '../lib/query'
-import { SPEEDS, useWard } from '../state/store'
+import { SPEEDS, useWard, type Mode } from '../state/store'
+
+const MODES: { id: Mode; label: string; icon: typeof Play }[] = [
+  { id: 'replay', label: 'Replay', icon: History },
+  { id: 'live', label: 'Live', icon: Radio },
+]
 
 export function Timeline() {
   const day = useWard((s) => s.day)
   const t = useWard((s) => s.t)
   const playing = useWard((s) => s.playing)
   const speed = useWard((s) => s.speed)
+  const mode = useWard((s) => s.mode)
   const setT = useWard((s) => s.setT)
   const setPlaying = useWard((s) => s.setPlaying)
   const setSpeed = useWard((s) => s.setSpeed)
+  const setMode = useWard((s) => s.setMode)
+  const live = mode === 'live'
 
   const marks = useMemo(() => (day ? day.alerts.map((a) => ({ id: a.id, at: a.from, color: SEVERITY[a.severity], title: `${clock(a.from)} ${a.title}` })) : []), [day])
 
   return (
-    <footer className="timeline">
-      <button
-        className="play"
-        onClick={() => {
-          if (!playing && t >= 1435) setT(0)
-          setPlaying(!playing)
-        }}
-        aria-label={playing ? 'Pause the replay' : 'Play the day'}
-        disabled={!day}
-      >
-        {playing ? <Pause size={18} strokeWidth={2} aria-hidden="true" /> : <Play size={18} strokeWidth={2} aria-hidden="true" />}
-      </button>
+    <footer className="timeline" data-mode={mode}>
+      {live ? (
+        <FeedDot />
+      ) : (
+        <button
+          className="play"
+          onClick={() => {
+            if (!playing && t >= 1435) setT(0)
+            setPlaying(!playing)
+          }}
+          aria-label={playing ? 'Pause the replay' : 'Play the day'}
+          disabled={!day}
+        >
+          {playing ? <Pause size={18} strokeWidth={2} aria-hidden="true" /> : <Play size={18} strokeWidth={2} aria-hidden="true" />}
+        </button>
+      )}
       <output className="clock num" aria-live="off">
         {clock(t)}
       </output>
@@ -57,17 +69,64 @@ export function Timeline() {
             setT(Number(e.target.value))
           }}
           aria-label="Time of day"
-          aria-valuetext={clock(t)}
-          disabled={!day}
+          aria-valuetext={live ? `${clock(t)}, live` : clock(t)}
+          disabled={!day || live}
         />
       </div>
-      <div className="seg seg--small" role="radiogroup" aria-label="Replay speed">
-        {SPEEDS.map((s) => (
-          <button key={s} role="radio" aria-checked={speed === s} className="seg__btn" onClick={() => setSpeed(s)} aria-label={`${s} simulated minutes per second`}>
-            <span className="num">{s === 60 ? '1 h' : `${s} min`}/s</span>
-          </button>
-        ))}
+      <div className="timeline__end">
+        {live ? (
+          <FeedState />
+        ) : (
+          <div className="seg seg--small" role="radiogroup" aria-label="Replay speed">
+            {SPEEDS.map((s) => (
+              <button key={s} role="radio" aria-checked={speed === s} className="seg__btn" onClick={() => setSpeed(s)} aria-label={`${s} simulated minutes per second`}>
+                <span className="num">{s === 60 ? '1 h' : `${s} min`}/s</span>
+              </button>
+            ))}
+          </div>
+        )}
+        <div className="seg seg--small seg--mode" role="radiogroup" aria-label="Data">
+          {MODES.map(({ id, label, icon: Icon }) => (
+            <button key={id} role="radio" aria-checked={mode === id} aria-label={label} title={label} className="seg__btn" onClick={() => setMode(id)}>
+              <Icon size={14} strokeWidth={1.75} aria-hidden="true" />
+              <span>{label}</span>
+            </button>
+          ))}
+        </div>
       </div>
     </footer>
+  )
+}
+
+/** Where the play button stands in replay: the state of the connection at a glance. */
+function FeedDot() {
+  // Between attempts and during one, it is the same outage: amber throughout.
+  const state = useWard((s) => (s.feed.state === 'connecting' && s.feed.attempt > 0 ? 'retrying' : s.feed.state))
+  return <span className="feed-dot" data-state={state} aria-hidden="true" />
+}
+
+function FeedState() {
+  const feed = useWard((s) => s.feed)
+  const [, redraw] = useState(0)
+  // Count down to the next attempt. Only the change of state is announced, not every second of it.
+  useEffect(() => {
+    if (feed.state !== 'retrying') return
+    const id = setInterval(() => redraw((n) => n + 1), 250)
+    return () => clearInterval(id)
+  }, [feed])
+
+  let said = ''
+  let countdown = ''
+  if (feed.state === 'connecting') said = feed.attempt ? 'Reconnecting…' : 'Connecting…'
+  else if (feed.state === 'live') said = feed.caughtUp === undefined ? 'Live' : `Live, ${feed.caughtUp} missed ${feed.caughtUp === 1 ? 'event' : 'events'} replayed`
+  else if (feed.state === 'retrying') {
+    said = `Offline, retry ${feed.attempt}`
+    countdown = ` in ${Math.max(1, Math.ceil((feed.at - Date.now()) / 1000))} s`
+  }
+  return (
+    <p className="feed" data-state={feed.state} title={said + countdown}>
+      <span role="status">{said}</span>
+      {countdown && <span aria-hidden="true">{countdown}</span>}
+    </p>
   )
 }

@@ -1,4 +1,4 @@
-import { ArrowLeft, BatteryLow, BellRing, Info, OctagonAlert, Play, TriangleAlert } from 'lucide-react'
+import { ArrowLeft, BatteryLow, BellRing, Info, OctagonAlert, Play, TriangleAlert, Unplug } from 'lucide-react'
 import { BED_ROOMS, ROOM_BY_ID } from '../data/floorplan'
 import type { Alert, AssetKind, BedState, Day, Severity } from '../data/types'
 import { describe, severityAt } from '../lib/alerts'
@@ -19,10 +19,13 @@ import {
   roomName,
   sample,
 } from '../lib/query'
+import { outage } from '../live/mock'
 import { useWard } from '../state/store'
 import { DayChart, StateStrip } from './Chart'
 
 const SEV_ICON: Record<Severity, typeof Info> = { critical: OctagonAlert, warning: TriangleAlert, info: Info }
+/** A span that is still going on (live mode) ends now, as far as anyone knows. */
+const until = (to: number) => (Number.isFinite(to) ? clock(to) : 'now')
 const STATES: BedState[] = ['occupied', 'ready', 'cleaning', 'dirty', 'blocked']
 
 export function Panel() {
@@ -68,6 +71,7 @@ function Overview({ day }: { day: Day }) {
   const alerts = activeAlerts(day, t).sort((a, b) => rank[severityAt(a, day, t)] - rank[severityAt(b, day, t)] || a.from - b.from)
   const setPlaying = useWard((s) => s.setPlaying)
   const playing = useWard((s) => s.playing)
+  const live = useWard((s) => s.mode === 'live')
   const groups = [
     { label: 'Ward 4A', rooms: BED_ROOMS.filter((r) => r.id.startsWith('4A')) },
     { label: 'Ward 4B', rooms: BED_ROOMS.filter((r) => r.id.startsWith('4B')) },
@@ -77,14 +81,20 @@ function Overview({ day }: { day: Day }) {
   return (
     <>
       <section className="section intro">
-        <p>
-          A digital twin of one hospital floor, replaying a simulated day. Colour the floor by beds, temperature, air or call lights; pick any room or
-          piece of equipment for its day.
-        </p>
-        {!playing && (
-          <button className="btn" onClick={() => setPlaying(true)}>
-            <Play size={15} strokeWidth={2} aria-hidden="true" /> Play from {clock(t)}
-          </button>
+        {live ? (
+          <LiveIntro />
+        ) : (
+          <>
+            <p>
+              A digital twin of one hospital floor, replaying a simulated day. Colour the floor by beds, temperature, air or call lights; pick any room or
+              piece of equipment for its day.
+            </p>
+            {!playing && (
+              <button className="btn" onClick={() => setPlaying(true)}>
+                <Play size={15} strokeWidth={2} aria-hidden="true" /> Play from {clock(t)}
+              </button>
+            )}
+          </>
         )}
       </section>
 
@@ -138,8 +148,9 @@ function Overview({ day }: { day: Day }) {
         </h2>
         {alerts.length === 0 ? (
           <p className="empty">
-            Nothing is flagged at {clock(t)}. Drag the timeline into the afternoon: discharges, a warm room and a low pump battery all land between 13:00 and
-            16:00.
+            {live
+              ? `Nothing is flagged at ${clock(t)}.`
+              : `Nothing is flagged at ${clock(t)}. Drag the timeline into the afternoon: discharges, a warm room and a low pump battery all land between 13:00 and 16:00.`}
           </p>
         ) : (
           <ul className="alerts">
@@ -154,6 +165,28 @@ function Overview({ day }: { day: Day }) {
         <h2 className="h2">Equipment</h2>
         <Fleet day={day} t={t} />
       </section>
+    </>
+  )
+}
+
+/** The mock server is the demo's; a real feed (VITE_FEED_URL) cannot be taken down from here. */
+const MOCK = !import.meta.env.VITE_FEED_URL
+
+function LiveIntro() {
+  const up = useWard((s) => s.feed.state === 'live')
+  return (
+    <>
+      <p>
+        {MOCK
+          ? 'A digital twin of one hospital floor, fed live: a mock server streams the simulated day as events, a simulated minute each second. '
+          : 'A digital twin of one hospital floor, built from the events of a live feed. '}
+        The floor holds only what has arrived, so nothing from later in the day is known.
+      </p>
+      {MOCK && (
+        <button className="btn" onClick={() => outage(4000)} disabled={!up}>
+          <Unplug size={15} strokeWidth={2} aria-hidden="true" /> Take the server down for 4 seconds
+        </button>
+      )}
     </>
   )
 }
@@ -283,8 +316,8 @@ function RoomDetail({ day, id }: { day: Day; id: string }) {
             {bed.note && <p className="note">{bed.note}.</p>}
             <StateStrip
               t={t}
-              label={`Bed states through the day: ${spans.map((s) => `${BED_LABEL[s.state]} ${clock(s.from)} to ${clock(s.to)}`).join('; ')}`}
-              parts={spans.map((s) => ({ from: s.from, to: s.to, color: BED[s.state].soft, title: `${BED_LABEL[s.state]}, ${clock(s.from)}–${clock(s.to)}` }))}
+              label={`Bed states through the day: ${spans.map((s) => `${BED_LABEL[s.state]} ${clock(s.from)} to ${until(s.to)}`).join('; ')}`}
+              parts={spans.map((s) => ({ from: s.from, to: Number.isFinite(s.to) ? s.to : t, color: BED[s.state].soft, title: `${BED_LABEL[s.state]}, ${clock(s.from)}–${until(s.to)}` }))}
             />
             {turnaround && (
               <p className="small">

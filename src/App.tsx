@@ -1,7 +1,11 @@
 import { Component, Suspense, lazy, useEffect, type ReactNode } from 'react'
 import type { Day } from './data/types'
 import { ROOM_BY_ID } from './data/floorplan'
-import { ASSET_LABEL, BED_LABEL, bedAt } from './lib/query'
+import { ASSET_LABEL, BED_LABEL, bedAt, clock } from './lib/query'
+import { openFeed, webSocketTransport } from './live/feed'
+import { mockTransport } from './live/mock'
+import { SEED } from './sim/simulate'
+import { STEP } from './sim/time'
 import { useQuality } from './state/quality'
 import { syncUrl, useWard } from './state/store'
 import { LayerDock, ViewTools } from './ui/LayerDock'
@@ -15,12 +19,15 @@ import { TopBar } from './ui/TopBar'
 const Scene = lazy(() => import('./scene/Scene'))
 
 export default function App() {
-  const day = useWard((s) => s.day)
+  // Only whether there is a day: in live mode the day changes every second, and the whole tree need not follow.
+  const ready = useWard((s) => s.day !== null)
   const view = useWard((s) => s.view)
+  const live = useWard((s) => s.mode === 'live')
   const lost = useQuality((s) => s.lost)
   const epoch = useQuality((s) => s.epoch)
   const rebuild = useQuality((s) => s.rebuild)
   useSimulation()
+  useLiveFeed()
   usePlayback()
   useKeys()
   useEffect(syncUrl, [])
@@ -39,11 +46,12 @@ export default function App() {
         <LayerDock />
         <ViewTools />
         {view === 'list' && <ListView />}
-        {!day && (
+        {!ready && (
           <div className="loading" role="status">
-            Building the simulated day…
+            {live ? 'Connecting to the live feed…' : 'Building the simulated day…'}
           </div>
         )}
+        <Stale />
         {lost && (
           <div className="paused" role="status">
             <p>The 3D view paused: the graphics driver reset. It restarts on its own when the browser allows.</p>
@@ -70,9 +78,22 @@ function useSimulation() {
       setDay(e.data.day, e.data.ms)
       worker.terminate()
     }
-    worker.postMessage({ seed: 20260928 })
+    worker.postMessage({ seed: SEED })
     return () => worker.terminate()
   }, [setDay])
+}
+
+/** In live mode, opens the feed and folds what it sends into the day the views read. */
+function useLiveFeed() {
+  const live = useWard((s) => s.mode === 'live')
+  useEffect(() => {
+    if (!live) return
+    const { applyFeed, setFeed, replayT } = useWard.getState()
+    const url = import.meta.env.VITE_FEED_URL as string | undefined
+    // The mock server starts its clock where the replay stood, on the five-minute grid.
+    const transport = url ? webSocketTransport(url) : mockTransport(Math.floor(replayT / STEP) * STEP)
+    return openFeed(transport, { apply: applyFeed, status: setFeed })
+  }, [live])
 }
 
 /** Advances the clock while playing, about twelve updates a second. */
@@ -114,7 +135,7 @@ function useKeys() {
         document.getElementById('search')?.focus()
       } else if (e.key === 'Escape' && s.selection) {
         s.select(null)
-      } else if (e.key === ' ' && !el.closest('button, a, [role="radio"]')) {
+      } else if (e.key === ' ' && s.mode === 'replay' && !el.closest('button, a, [role="radio"]')) {
         e.preventDefault()
         s.setPlaying(!s.playing)
       }
@@ -122,6 +143,18 @@ function useKeys() {
     window.addEventListener('keydown', onKey)
     return () => window.removeEventListener('keydown', onKey)
   }, [])
+}
+
+/** Live data that has stopped arriving must not pass for live, so the stage says so. The feed status announces it. */
+function Stale() {
+  const offline = useWard((s) => s.mode === 'live' && s.day !== null && s.feed.state !== 'live')
+  const t = useWard((s) => s.t)
+  if (!offline) return null
+  return (
+    <p className="stale" aria-hidden="true">
+      No connection. Showing the floor as of <span className="num">{clock(t)}</span>
+    </p>
+  )
 }
 
 /** Tells screen readers what the 3D view just focused on. */

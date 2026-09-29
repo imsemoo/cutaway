@@ -95,3 +95,24 @@ test('a lost WebGL context pauses the scene and rebuilds it when restored', asyn
   })
   expect(lost).toBe(false)
 })
+
+test('live mode streams the day, and catches up after the server goes down', async ({ page }) => {
+  await page.goto('/?mode=live')
+  await expect(page.getByRole('radio', { name: 'Live' })).toHaveAttribute('aria-checked', 'true')
+  const status = page.locator('.feed [role="status"]')
+  await expect(status).toHaveText('Live')
+  const clock = page.locator('.clock')
+  const first = await clock.textContent()
+  await expect(clock).not.toHaveText(first ?? '')
+
+  await page.getByRole('button', { name: 'Take the server down for 4 seconds' }).click()
+  await expect(status).toContainText('Offline')
+  await expect(page.locator('.stale')).toBeVisible()
+  await expect(status).toContainText('replayed', { timeout: 20_000 })
+  await expect(page.locator('.stale')).toBeHidden()
+
+  await page.getByRole('radio', { name: 'Replay' }).click()
+  await expect(clock).toHaveText('14:30')
+  await expect(page.locator('.alert')).toHaveCount(4)
+  await expect(page).not.toHaveURL(/mode=live/)
+})

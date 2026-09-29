@@ -17,6 +17,7 @@
   --accent-soft: #e7ecfc;
   --crit: #c8241b;
   --warn: #b86e00;
+  --ok: #157a4c;
   --font: 'Schibsted Grotesk', system-ui, -apple-system, 'Segoe UI', sans-serif;
   --mono: 'Fragment Mono', ui-monospace, 'SF Mono', Consolas, monospace;
   --r: 6px;
@@ -935,6 +936,11 @@ button {
 .btn:hover {
   background: var(--accent);
 }
+.btn:disabled {
+  opacity: 0.45;
+  background: var(--text);
+  cursor: default;
+}
 
 .link {
   padding: 0;
@@ -1175,6 +1181,76 @@ button {
   text-underline-offset: 3px;
 }
 
+.timeline__end {
+  display: flex;
+  flex: 0 1 auto;
+  align-items: center;
+  gap: 14px;
+  min-width: 0;
+}
+
+/* ---------- Live feed ---------- */
+
+/* In live mode the play button's place shows the connection: green and breathing when live, amber when offline. */
+.feed-dot {
+  display: grid;
+  place-items: center;
+  flex: none;
+  width: 38px;
+  height: 38px;
+}
+.feed-dot::after {
+  content: '';
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  background: var(--text-3);
+}
+.feed-dot[data-state='live']::after {
+  background: var(--ok);
+  animation: feed-pulse 2s ease-out infinite;
+}
+.feed-dot[data-state='retrying']::after {
+  background: var(--warn);
+}
+@keyframes feed-pulse {
+  from {
+    box-shadow: 0 0 0 0 rgb(21 122 76 / 0.45);
+  }
+  to {
+    box-shadow: 0 0 0 9px rgb(21 122 76 / 0);
+  }
+}
+.feed {
+  flex: 0 1 auto;
+  min-width: 0;
+  max-width: 260px;
+  margin: 0;
+  overflow: hidden;
+  color: var(--text-2);
+  font-size: 12.5px;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+
+/* Live data that stopped arriving must not pass for live. */
+.stale {
+  position: absolute;
+  top: 12px;
+  left: 12px;
+  z-index: 4;
+  max-width: calc(100% - 80px);
+  margin: 0;
+  padding: 7px 12px 7px 10px;
+  border: 1px solid var(--line);
+  border-left: 3px solid var(--warn);
+  border-radius: var(--r);
+  background: var(--surface);
+  box-shadow: var(--shadow);
+  color: var(--text);
+  font-size: 13px;
+}
+
 /* ---------- Small screens ---------- */
 
 @media (max-width: 1100px) {
@@ -1182,6 +1258,13 @@ button {
     --panel-w: 340px;
   }
   .hint {
+    display: none;
+  }
+}
+
+/* A narrow footer beside the panel: the data switch keeps its icons only. */
+@media (min-width: 901px) and (max-width: 1100px) {
+  .seg--mode .seg__btn span {
     display: none;
   }
 }
@@ -1226,9 +1309,10 @@ button {
   .track {
     flex: 1 1 200px;
   }
-  .seg--small {
-    order: 4;
-    margin-left: auto;
+  /* Speed or connection on the left of the second row, the data switch on the right, whatever the text. */
+  .timeline__end {
+    flex: 1 1 100%;
+    justify-content: space-between;
   }
 }
 
@@ -1283,5 +1367,8 @@ button {
   *::after {
     transition-duration: 0.01ms !important;
     animation-duration: 0.01ms !important;
+  }
+  .feed-dot[data-state='live']::after {
+    animation: none;
   }
 }
