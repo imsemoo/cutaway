@@ -182,3 +182,37 @@ test('finds the nearest free pump for a room and draws the way to it', async ({ 
   await page.getByRole('button', { name: 'Clear the way' }).click()
   await expect(found).toHaveCount(0)
 })
+
+test('switches to Arabic, right to left, keeps the choice, and switches back', async ({ page }, info) => {
+  await page.goto('/')
+  await expect(page.locator('.alert')).toHaveCount(4)
+  await page.getByRole('button', { name: 'العربية' }).click()
+  await expect(page.locator('html')).toHaveAttribute('dir', 'rtl')
+  await expect(page.locator('html')).toHaveAttribute('lang', 'ar')
+  await expect(page).toHaveURL(/lang=ar/)
+  await expect(page.getByRole('heading', { name: /يحتاج انتباهًا/ })).toBeVisible()
+  expect(await page.evaluate(() => document.documentElement.scrollWidth - document.documentElement.clientWidth)).toBeLessThanOrEqual(0)
+  // The panel mirrors to the left of the model on a wide screen; on a phone it sits below.
+  if (info.project.name === 'desktop') {
+    const panel = (await page.locator('.panel').boundingBox())!
+    const stage = (await page.locator('.stage').boundingBox())!
+    expect(panel.x).toBeLessThan(stage.x)
+  }
+  // The choice is remembered without the link.
+  await page.goto('/')
+  await expect(page.locator('html')).toHaveAttribute('dir', 'rtl')
+  await page.getByRole('button', { name: 'English' }).click()
+  await expect(page.locator('html')).toHaveAttribute('dir', 'ltr')
+  await expect(page).not.toHaveURL(/lang=/)
+  await expect(page.getByRole('heading', { name: /Needs attention/ })).toBeVisible()
+})
+
+test('an Arabic link opens in Arabic, with readings, times and room numbers intact', async ({ page }) => {
+  await page.goto('/?lang=ar&select=4A09&t=15:30')
+  await expect(page.locator('.title')).toContainText('4A09')
+  await expect(page.locator('.alert__title')).toContainText('الغرفة أدفأ من اللازم')
+  await expect(page.locator('.alert__detail')).toContainText('°م الآن، والحد 25.5 °م')
+  await page.getByRole('radio', { name: 'قائمة' }).click()
+  await expect(page.getByRole('columnheader', { name: 'الغرفة' })).toBeVisible()
+  await expect(page.locator('.rooms tbody tr')).toHaveCount(38)
+})

@@ -21,6 +21,22 @@ for (const file of readdirSync(dir).filter((f) => f.endsWith('.js'))) {
   console.log(`${over ? 'OVER' : 'ok  '}  ${name.padEnd(8)} ${kb.toFixed(1).padStart(6)} kB${limit ? ` / ${limit} kB` : ''}`)
 }
 
+// What paints the interface is the entry chunk and every chunk it imports statically: the
+// bundler can move shared modules out of index into small chunks, and those load first too.
+const FIRST_LOAD = 90
+const gz = (file) => gzipSync(readFileSync(join(dir, file)), { level: 9 }).length / 1000
+const first = new Set()
+const load = (file) => {
+  if (first.has(file)) return
+  first.add(file)
+  for (const m of readFileSync(join(dir, file), 'utf8').matchAll(/(?:^|[;}])import(?:[^'"()]*?from)?\s*["']\.\/([^"']+\.js)["']/g)) load(m[1])
+}
+load(readdirSync(dir).find((f) => /^index-.*\.js$/.test(f)))
+const firstKb = [...first].reduce((kb, f) => kb + gz(f), 0)
+const heavy = firstKb > FIRST_LOAD
+failed ||= heavy
+console.log(`${heavy ? 'OVER' : 'ok  '}  first load ${firstKb.toFixed(1).padStart(6)} kB / ${FIRST_LOAD} kB (${[...first].map((f) => f.split('-')[0]).join(' + ')})`)
+
 if (failed) {
   console.error('A bundle is over budget.')
   process.exit(1)

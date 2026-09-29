@@ -10,7 +10,7 @@ Everything on screen is simulated. There is no real hospital, patient or reading
 
 The full film, 40 seconds, goes on to the way to the nearest free pump, the whole hospital and a level: [film/ward-twin-720.mp4](film/ward-twin-720.mp4), captured frame by frame on a controlled clock by `tools/film`.
 
-**Live:** https://imsemoo.github.io/ward-twin/ (add `?stats` for a frame meter, or open [live mode](https://imsemoo.github.io/ward-twin/?mode=live))
+**Live:** https://imsemoo.github.io/ward-twin/ (add `?stats` for a frame meter, or open [live mode](https://imsemoo.github.io/ward-twin/?mode=live) or [the Arabic interface](https://imsemoo.github.io/ward-twin/?lang=ar))
 
 ## What it does
 
@@ -24,6 +24,10 @@ The full film, 40 seconds, goes on to the way to the nearest free pump, the whol
 - **Or live.** Live mode connects to a feed and builds the floor from events as they arrive. In the demo, a mock server in a Web Worker streams the simulated day at a simulated minute a second, over the JSON protocol a real integration server would use. The footer shows the connection. "Take the server down for 4 seconds" shows the recovery: retries back off, the stage says the floor is stale, and the missed events are replayed on reconnect.
 - **The nearest free equipment, and the way to it.** From any bed, "Nearest free" finds the pump, wheelchair, bladder scanner or, in the ICU, ventilator that is quickest to reach on foot anywhere in the hospital, and draws the way on the floors with the walking time. When the nearest one is in another wing the view pulls out to the level, and to the whole hospital when the way takes a lift.
 - **Pick anything:** click a room or a piece of equipment, or search for it with `/`. The camera flies to it and the side panel shows its day: bed states as a strip, 24-hour temperature and CO₂ charts with limits, call lights, and the equipment in the room.
+- **In English or Arabic.** A switch in the top bar turns the whole interface to Arabic, right to left, and back; the choice is kept, and `?lang=ar` opens in Arabic.
+  - The layout mirrors: the panel moves to the left of the model, the overlays swap sides, the back arrow and the trail turn around. Time and scales do not: the timeline runs left to right as in any media player, and so do the charts, the colour ramps and the map of the building, where the A wing stays west.
+  - Room names are written in Arabic on the floors too, and the alerts are worded in Arabic at the minute on the timeline, with Arabic plurals: دقيقتان for two minutes, 3 دقائق, 11 دقيقة.
+  - Digits stay Western, like the room numbers (4A09) and clock times they sit beside.
 - **Every view is a link.** The address bar keeps the view, layer, time and selection, so `?view=plan&layer=air&t=18:00&select=FAM` opens the family lounge at its stuffiest hour, `?at=level-4` a whole level and `?at=hospital` the whole hospital.
 - **Alerts that only know the present.** Each alert is worded at the replay minute ("Pressed at 14:21, 9 min without an answer"), so scrubbing never leaks what happens next.
 
@@ -65,7 +69,12 @@ The full film, 40 seconds, goes on to the way to the nearest free pump, the whol
   - It stops flipping after four changes, so a device on the edge settles.
   - `?quality=0` to `3` pins a level.
 - **Context loss recovery.** If the GPU driver resets, the scene says it has paused, and the canvas is rebuilt from scratch when the context comes back. A browser test forces a loss and checks the recovery.
-- **Code-split by weight.** The interface paints first (under 90 kB gzipped). The scene and three.js follow (213 kB and 99 kB), then the model loader (20 kB). Ambient occlusion and SMAA load last, and only when the quality level uses them (157 kB, a third of it SMAA's lookup texture). CI enforces a budget for every chunk.
+- **Arabic without weight for English readers.** English is the key: every string is written in English where it is used and passed through `say()`, so the code reads as it did. The Arabic catalogue is its own 6 kB file, fetched only when Arabic is chosen, and Vazirmatn, the Arabic face, is declared for Arabic letters only, so an English visit never downloads it.
+  - Vazirmatn was picked by setting the interface's own text in six Arabic faces beside Schibsted Grotesk: it matches the grotesk's size and calm, and keeps the panel's line spacing.
+  - Counts go through `Intl.PluralRules`, which gives Arabic its six forms. Placeholders are named, so each language puts the number where its grammar wants it.
+  - The floor labels are troika text in Vazirmatn, which shapes and joins Arabic in WebGL.
+  - A test parses the source with the TypeScript compiler, collects every string passed to `say()` and `plural()`, and fails if the catalogue misses one, drops a placeholder or keeps a string the interface no longer says.
+- **Code-split by weight.** What paints the interface loads first: 89.7 kB gzipped, the entry chunk and the two small chunks it imports, which the budget counts together. Live mode and the list view load when someone opens them. The scene and three.js follow (215 kB and 99 kB), then the model loader (20 kB). Ambient occlusion and SMAA load last, and only when the quality level uses them (157 kB, a third of it SMAA's lookup texture). CI enforces a budget for every chunk and for the first load.
 - **The camera fits the building by projection:** it projects the floor's corners through a trial camera to find the distance and offset that keep the model clear of the overlays, and turns the building lengthwise on tall screens.
 - Reduced motion turns camera flights and the wall animation into cuts.
 
@@ -86,7 +95,7 @@ The on-screen meter (`?stats`) shows the frame rate while moving, draw calls, tr
 
 ## Tests
 
-- `npm test` runs 51 unit tests on the hospital plan, the simulation, the queries, the alert wording, the live feed, the wayfinding and the corridor field:
+- `npm test` runs 56 unit tests on the hospital plan, the simulation, the queries, the alert wording, the live feed, the wayfinding, the corridor field and the Arabic catalogue:
   - six levels of six wings, with unique ids, every room inside its wing and no two rooms overlapping;
   - the same seed gives the same day, and every wing a day of its own;
   - more than 3,000 pieces of equipment, each only ever inside its own wing;
@@ -98,8 +107,9 @@ The on-screen meter (`?stats`) shows the frame rate while moving, draw calls, tr
   - the day rebuilt from the event log, batch by batch, reads exactly like the recording at every five-minute reading, and holds nothing from later in the day;
   - the connection resumes after a drop, asks again after a gap, drops a silent link and backs off with jitter;
   - every room reaches every other; a way follows corridors and links, crosses to the next wing, the other row or another level when it must, and counts a lift ride in time but not in metres;
-  - every room has a door on a corridor, and every wing matches the plan room for room, so the shader finds each reading where it looks.
-- `npm run test:e2e` runs 14 browser tests at desktop and phone size, with real WebGL. They cover shared links, layers, the list view, search, playback, sideways scroll, recovery from a lost WebGL context, live mode through a server outage, the whole hospital, a level and a wing, the panel opening each new place at its top, and the way to the nearest free pump. Every test fails on a console error.
+  - every room has a door on a corridor, and every wing matches the plan room for room, so the shader finds each reading where it looks;
+  - the Arabic catalogue covers every string the code says, with the same placeholders and nothing stale, and counts by Arabic's plural rules.
+- `npm run test:e2e` runs 16 browser tests at desktop and phone size, with real WebGL. They cover shared links, layers, the list view, search, playback, sideways scroll, recovery from a lost WebGL context, live mode through a server outage, the whole hospital, a level and a wing, the panel opening each new place at its top, the way to the nearest free pump, and the Arabic interface: right to left, remembered, and read from a link. Every test fails on a console error.
 - `npm run check` runs types, lint, the unit tests, the build and the bundle budget. CI runs all of it, plus the browser tests, before every deploy; a failing check blocks the deploy.
 
 ## Run it

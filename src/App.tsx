@@ -1,23 +1,21 @@
 import { Component, Suspense, lazy, useEffect, type ReactNode } from 'react'
 import type { Day } from './data/types'
 import { ROOM_BY_ID } from './data/floorplan'
-import { ASSET_LABEL, BED_LABEL, bedAt, clock } from './lib/query'
-import { openFeed, webSocketTransport } from './live/feed'
-import { mockTransport } from './live/mock'
+import { say, useLang } from './i18n'
+import { assetLabel, bedAt, bedLabel, clock, roomName } from './lib/query'
 import { SEED } from './sim/simulate'
-import { STEP } from './sim/time'
 import { useQuality } from './state/quality'
 import { covers, syncUrl, useWard } from './state/store'
 import { Building } from './ui/Building'
 import { LayerDock, ViewTools } from './ui/LayerDock'
-import { ListView } from './ui/ListView'
 import { Panel } from './ui/Panel'
 import { Tags } from './ui/Tags'
 import { Timeline } from './ui/Timeline'
 import { TopBar } from './ui/TopBar'
 
-// The 3D bundle loads after the interface shell has painted.
+// The 3D bundle loads after the interface shell has painted; the table, only when someone opens the list view.
 const Scene = lazy(() => import('./scene/Scene'))
+const ListView = lazy(() => import('./ui/ListView'))
 
 export default function App() {
   // Only whether the day covers what is on show: in live mode the day changes every second, and the whole tree need not follow.
@@ -27,6 +25,8 @@ export default function App() {
   const lost = useQuality((s) => s.lost)
   const epoch = useQuality((s) => s.epoch)
   const rebuild = useQuality((s) => s.rebuild)
+  // A new language redraws every word; the timeline, which remembers its marks, starts over.
+  const lang = useLang((s) => s.lang)
   useSimulation()
   useLiveFeed()
   usePlayback()
@@ -35,9 +35,11 @@ export default function App() {
 
   return (
     <div className="app" data-view={view}>
-      <a className="skip" href="#details">Skip to details</a>
+      <a className="skip" href="#details">
+        {say('Skip to details')}
+      </a>
       <TopBar />
-      <main className="stage" aria-label="Floor model">
+      <main className="stage" aria-label={say('Floor model')}>
         <WebGLBoundary>
           <Suspense fallback={null}>
             <Scene key={epoch} />
@@ -47,23 +49,27 @@ export default function App() {
         <Building />
         <LayerDock />
         <ViewTools />
-        {view === 'list' && <ListView />}
+        {view === 'list' && (
+          <Suspense fallback={null}>
+            <ListView />
+          </Suspense>
+        )}
         {!ready && (
           <div className="loading" role="status">
-            {live ? 'Connecting to the live feed…' : 'Building the simulated day…'}
+            {live ? say('Connecting to the live feed…') : say('Building the simulated day…')}
           </div>
         )}
         <Stale />
         {lost && (
           <div className="paused" role="status">
-            <p>The 3D view paused: the graphics driver reset. It restarts on its own when the browser allows.</p>
+            <p>{say('The 3D view paused: the graphics driver reset. It restarts on its own when the browser allows.')}</p>
             <button className="btn" onClick={rebuild}>
-              Restart the 3D view
+              {say('Restart the 3D view')}
             </button>
           </div>
         )}
       </main>
-      <Timeline />
+      <Timeline key={lang} />
       <div id="details" className="panel-wrap">
         <Panel />
       </div>
@@ -87,16 +93,20 @@ function useSimulation() {
   }, [setDay])
 }
 
-/** In live mode, opens the feed and folds what it sends into the day the views read. */
+/** In live mode, opens the feed. Its code loads the first time live mode is turned on. */
 function useLiveFeed() {
   const live = useWard((s) => s.mode === 'live')
   useEffect(() => {
     if (!live) return
-    const { applyFeed, setFeed, replayT } = useWard.getState()
-    const url = import.meta.env.VITE_FEED_URL as string | undefined
-    // The mock server starts its clock where the replay stood, on the five-minute grid.
-    const transport = url ? webSocketTransport(url) : mockTransport(Math.floor(replayT / STEP) * STEP)
-    return openFeed(transport, { apply: applyFeed, status: setFeed })
+    let close: (() => void) | undefined
+    let left = false
+    void import('./live/connect').then(({ connect }) => {
+      if (!left) close = connect()
+    })
+    return () => {
+      left = true
+      close?.()
+    }
   }, [live])
 }
 
@@ -156,7 +166,7 @@ function Stale() {
   if (!offline) return null
   return (
     <p className="stale" aria-hidden="true">
-      No connection. Showing the floor as of <span className="num">{clock(t)}</span>
+      {say('No connection. Showing the floor as of')} <span className="num">{clock(t)}</span>
     </p>
   )
 }
@@ -170,10 +180,10 @@ function Announcer() {
   if (day && selection?.type === 'room') {
     const r = ROOM_BY_ID[selection.id]
     const b = bedAt(day, r.id, t)
-    text = `${r.name} selected${b ? `, ${BED_LABEL[b.state].toLowerCase()}` : ''}.`
+    text = say(b ? '{name} selected, {state}.' : '{name} selected.', { name: roomName(r.id), state: b ? bedLabel(b.state).toLowerCase() : '' })
   } else if (day && selection?.type === 'asset') {
     const a = day.assets.find((x) => x.id === selection.id)
-    if (a) text = `${ASSET_LABEL[a.kind]} ${a.id} selected.`
+    if (a) text = say('{kind} {id} selected.', { kind: assetLabel(a.kind), id: a.id })
   }
   return (
     <p className="sr-only" aria-live="polite">
@@ -192,7 +202,7 @@ class WebGLBoundary extends Component<{ children: ReactNode }, { failed: boolean
   }
   render() {
     if (this.state.failed) {
-      return <p className="nogl">The 3D model needs WebGL, which is turned off or unavailable in this browser. The list view shows the same floor.</p>
+      return <p className="nogl">{say('The 3D model needs WebGL, which is turned off or unavailable in this browser. The list view shows the same floor.')}</p>
     }
     return this.props.children
   }

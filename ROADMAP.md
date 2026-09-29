@@ -72,6 +72,7 @@ What shows platform thinking.
 
 ### 3.1 Arabic, right to left
 A complete Arabic interface with a language switch, since a right-to-left digital twin is rare.
+- Built: English keys through `say()`, a lazy Arabic catalogue held complete by a test, Arabic plurals, Vazirmatn chosen by comparison, a mirrored layout with time and scales left to right, and Arabic room names on the floors.
 
 ### 3.2 Architecture notes
 An architecture page and short decision records, plus a "making of" write-up with the measured before-and-after numbers.
@@ -94,4 +95,5 @@ A `<ward-twin>` web component and a postMessage API, so a host dashboard can sel
 - [x] 2.2 A whole hospital: six levels of six wings, 1,368 rooms, 1,008 beds and 3,006 tracked assets; an exploded view, a view of each level with its wings joined by glazed links, a building map and a trail back up; the whole hospital in 33 draw calls at 72 to 90 fps on an integrated GPU
 - [x] 2.3 Wayfinding: the nearest free pump, wheelchair, scanner or ventilator from any bed, by walking time across wings, rows and lifts, drawn on the floors
 - [x] 2.4 Sensor heatmaps in a shader: corridors estimated in the fragment shader from the rooms' doors, with isolines and the alert limit; rooms keep their own readings
-- [ ] Phase 3
+- [x] 3.1 Arabic, right to left: the whole interface, the alerts and the floor labels, mirrored where Arabic reads that way; the first load stays at 90 kB
+- [ ] 3.2 to 3.4

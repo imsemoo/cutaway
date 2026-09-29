@@ -1,8 +1,9 @@
 import { Box, List, Map as MapIcon, Search as SearchIcon } from 'lucide-react'
 import { useMemo, useRef, useState, type KeyboardEvent } from 'react'
-import { BED_ROOMS, ROOMS, WINGS, WING_BY_CODE, isBed, wingName } from '../data/floorplan'
+import { BED_ROOMS, ROOMS, WINGS, WING_BY_CODE, isBed } from '../data/floorplan'
 import type { View } from '../data/types'
-import { ASSET_LABEL } from '../lib/query'
+import { plural, say, setLang, useLang } from '../i18n'
+import { assetLabel, roomName, roomTitle, wingName } from '../lib/query'
 import { HOSPITAL, scopeLevel, scopeWings } from '../state/scope'
 import { useWard } from '../state/store'
 
@@ -12,17 +13,20 @@ const VIEWS: { id: View; label: string; icon: typeof Box }[] = [
   { id: 'list', label: 'List', icon: List },
 ]
 
+const beds = (n: number) => plural(n, '{n} bed', '{n} beds')
+
 export function TopBar() {
   const view = useWard((s) => s.view)
   const setView = useWard((s) => s.setView)
   const scope = useWard((s) => s.scope)
+  const lang = useLang((s) => s.lang)
   const level = scopeLevel(scope)
   const where =
     scope === HOSPITAL
-      ? `Whole hospital · ${WINGS.length} wings, ${BED_ROOMS.length.toLocaleString('en-US')} beds`
+      ? say('Whole hospital · {wings}, {beds}', { wings: plural(WINGS.length, '{n} wing', '{n} wings'), beds: beds(BED_ROOMS.length) })
       : level
-        ? `Level ${level} · six wings, ${scopeWings(scope).reduce((n, w) => n + w.beds.length, 0)} beds`
-        : `${wingName(WING_BY_CODE[scope])} · two wards and an ICU`
+        ? say('Level {level} · six wings, {beds}', { level, beds: beds(scopeWings(scope).reduce((n, w) => n + w.beds.length, 0)) })
+        : say('{wing} · two wards and an ICU', { wing: wingName(WING_BY_CODE[scope]) })
   return (
     <header className="bar">
       <div className="brand">
@@ -33,23 +37,38 @@ export function TopBar() {
           <rect x="17.5" y="15.5" width="7" height="8" fill="#3d63ff" />
         </svg>
         <div className="brand__text">
-          <span className="brand__name">Ward Twin</span>
+          <span className="brand__name" lang="en">
+            Ward Twin
+          </span>
           <span className="brand__where">{where}</span>
         </div>
       </div>
-      <Search />
-      <span className="badge" title="Every number on this page comes from a simulated day. No real patients or hospital.">
-        Simulated data
+      {/* Its names are in the language on show, so it starts over in a new one. */}
+      <Search key={lang} />
+      <span className="badge" title={say('Every number on this page comes from a simulated day. No real patients or hospital.')}>
+        {say('Simulated data')}
       </span>
-      <div className="seg" role="radiogroup" aria-label="View">
+      <Language />
+      <div className="seg" role="radiogroup" aria-label={say('View')}>
         {VIEWS.map(({ id, label, icon: Icon }) => (
-          <button key={id} role="radio" aria-checked={view === id} aria-label={label} className="seg__btn" onClick={() => setView(id)}>
+          <button key={id} role="radio" aria-checked={view === id} aria-label={say(label)} className="seg__btn" onClick={() => setView(id)}>
             <Icon size={16} strokeWidth={1.75} aria-hidden="true" />
-            <span>{label}</span>
+            <span>{say(label)}</span>
           </button>
         ))}
       </div>
     </header>
+  )
+}
+
+/** The other language, named in itself, so a reader of either can find it. */
+function Language() {
+  const lang = useLang((s) => s.lang)
+  const other = lang === 'ar' ? 'en' : 'ar'
+  return (
+    <button className="lang" lang={other} onClick={() => void setLang(other)}>
+      {other === 'ar' ? 'العربية' : 'English'}
+    </button>
   )
 }
 
@@ -65,8 +84,8 @@ function Search() {
 
   const all = useMemo<Hit[]>(() => {
     // Every wing has its lounge and its store, so the hint names the wing.
-    const rooms: Hit[] = ROOMS.map((r) => ({ type: 'room', id: r.id, label: isBed(r) ? r.id : r.name, hint: isBed(r) ? r.name : wingName(WING_BY_CODE[r.wing]) }))
-    const assets: Hit[] = (day?.assets ?? []).map((a) => ({ type: 'asset', id: a.id, label: a.id, hint: `${ASSET_LABEL[a.kind]} · ${a.wing}` }))
+    const rooms: Hit[] = ROOMS.map((r) => ({ type: 'room', id: r.id, label: roomTitle(r), hint: isBed(r) ? roomName(r.id) : wingName(WING_BY_CODE[r.wing]) }))
+    const assets: Hit[] = (day?.assets ?? []).map((a) => ({ type: 'asset', id: a.id, label: a.id, hint: `${assetLabel(a.kind)} · ${a.wing}` }))
     return [...rooms, ...assets]
   }, [day])
 
@@ -116,7 +135,7 @@ function Search() {
         aria-autocomplete="list"
         autoComplete="off"
         spellCheck={false}
-        placeholder="Find a room or equipment"
+        placeholder={say('Find a room or equipment')}
         value={q}
         onChange={(e) => {
           setQ(e.target.value)
@@ -129,8 +148,8 @@ function Search() {
       />
       <kbd className="search__key" aria-hidden="true">/</kbd>
       {expanded && (
-        <ul id="search-results" className="search__list" role="listbox" aria-label="Matches">
-          {hits.length === 0 && <li className="search__empty">No room or equipment matches “{q.trim()}”. Try 4A09 or IVP.</li>}
+        <ul id="search-results" className="search__list" role="listbox" aria-label={say('Matches')}>
+          {hits.length === 0 && <li className="search__empty">{say('No room or equipment matches “{q}”. Try 4A09 or IVP.', { q: q.trim() })}</li>}
           {hits.map((h, i) => (
             <li
               key={`${h.type}-${h.id}`}

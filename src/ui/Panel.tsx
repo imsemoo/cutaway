@@ -1,28 +1,30 @@
 import { ArrowLeft, BatteryLow, BellRing, Building2, Info, OctagonAlert, Play, TriangleAlert, Unplug } from 'lucide-react'
 import { useLayoutEffect, useRef, useState } from 'react'
-import { BED_ROOMS, LEVELS, ROOMS, ROOM_BY_ID, STORY, WINGS, WING_BY_CODE, wingName, type Wing } from '../data/floorplan'
+import { BED_ROOMS, LEVELS, ROOMS, ROOM_BY_ID, STORY, WINGS, WING_BY_CODE, type Wing } from '../data/floorplan'
 import type { Alert, Asset, AssetKind, BedState, Day, Room, Severity } from '../data/types'
-import { describe, severityAt } from '../lib/alerts'
+import { plural, say } from '../i18n'
+import { alertTitle, describe, severityAt } from '../lib/alerts'
 import { ASSET_STATUS, BED, SEVERITY } from '../lib/colors'
 import {
-  ASSET_LABEL,
-  ASSET_STATUS_LABEL,
-  BED_LABEL,
   activeAlerts,
   activeCall,
   alertWing,
   assetAt,
+  assetLabel,
   assetsIn,
   batteryAt,
   bedAt,
+  bedLabel,
   census,
   clock,
   duration,
   roomName,
+  roomTitle,
   sample,
+  statusLabel,
   walking,
+  wingName,
 } from '../lib/query'
-import { outage } from '../live/mock'
 import { HOSPITAL, levelScope, scopeLevel, scopeWings } from '../state/scope'
 import { covers, useWard } from '../state/store'
 import { DayChart, StateStrip } from './Chart'
@@ -30,8 +32,27 @@ import { wingSummaries, type WingSummary } from './summary'
 
 const SEV_ICON: Record<Severity, typeof Info> = { critical: OctagonAlert, warning: TriangleAlert, info: Info }
 /** A span that is still going on (live mode) ends now, as far as anyone knows. */
-const until = (to: number) => (Number.isFinite(to) ? clock(to) : 'now')
+const until = (to: number) => (Number.isFinite(to) ? clock(to) : say('now'))
 const STATES: BedState[] = ['occupied', 'ready', 'cleaning', 'dirty', 'blocked']
+/** A name mid-sentence: "the equipment store", but "patient room 4A12" keeps its number. */
+const lowerFirst = (s: string) => s.charAt(0).toLowerCase() + s.slice(1)
+const celsius = (v: number) => say('{v} °C', { v: v.toFixed(1) })
+const ppm = (v: number) => say('{v} ppm', { v: Math.round(v).toLocaleString('en-US') })
+
+/** How the beds stand: the occupied count in bold, then the rest in a sentence. */
+function Lede({ counts, beds }: { counts: Record<BedState, number>; beds: number }) {
+  return (
+    <p className="lede">
+      <strong className="num">{counts.occupied.toLocaleString('en-US')}</strong>{' '}
+      {say('of {beds} occupied. {ready} ready for a patient, {cleaning} being cleaned, {dirty} waiting for cleaning.', {
+        beds: beds.toLocaleString('en-US'),
+        ready: counts.ready,
+        cleaning: counts.cleaning,
+        dirty: counts.dirty,
+      })}
+    </p>
+  )
+}
 
 export function Panel() {
   const day = useWard((s) => s.day)
@@ -46,7 +67,7 @@ export function Panel() {
     aside.current?.scrollTo({ top: 0 })
   }, [place])
   return (
-    <aside ref={aside} className="panel" aria-label="Details">
+    <aside ref={aside} className="panel" aria-label={say('Details')}>
       {!day || !ready ? (
         <PanelSkeleton />
       ) : selection?.type === 'room' ? (
@@ -57,7 +78,8 @@ export function Panel() {
         <Overview day={day} />
       )}
       <p className="credit">
-        A concept by <a href="https://imsemoo.github.io/eslam-portfolio/">Islam Nasser</a>. The hospital, patients and readings are simulated.
+        {say('A concept by')} <a href="https://imsemoo.github.io/eslam-portfolio/">{say('Islam Nasser')}</a>.{' '}
+        {say('The hospital, patients and readings are simulated.')}
       </p>
     </aside>
   )
@@ -65,7 +87,7 @@ export function Panel() {
 
 function PanelSkeleton() {
   return (
-    <div className="section" aria-busy="true" aria-label="Loading the simulated day">
+    <div className="section" aria-busy="true" aria-label={say('Loading the simulated day')}>
       <div className="skel skel--title" />
       <div className="skel" />
       <div className="skel" />
@@ -100,12 +122,12 @@ function Trail() {
   if (scope === HOSPITAL) return null
   const level = scopeLevel(scope) ?? WING_BY_CODE[scope].level
   const steps = [
-    { label: 'Hospital', to: HOSPITAL },
-    { label: `Level ${level}`, to: levelScope(level) },
-    ...(scopeLevel(scope) ? [] : [{ label: `${scope.slice(1)} wing`, to: scope }]),
+    { label: say('Hospital'), to: HOSPITAL },
+    { label: say('Level {level}', { level }), to: levelScope(level) },
+    ...(scopeLevel(scope) ? [] : [{ label: say('{code} wing', { code: scope.slice(1) }), to: scope }]),
   ]
   return (
-    <nav className="trail" aria-label="Where you are">
+    <nav className="trail" aria-label={say('Where you are')}>
       <ol>
         {steps.map((s, i) =>
           i === steps.length - 1 ? (
@@ -140,7 +162,7 @@ function PlayButton() {
   if (playing) return null
   return (
     <button className="btn" onClick={() => setPlaying(true)}>
-      <Play size={15} strokeWidth={2} aria-hidden="true" /> Play from {clock(t)}
+      <Play size={15} strokeWidth={2} aria-hidden="true" /> {say('Play from {time}', { time: clock(t) })}
     </button>
   )
 }
@@ -152,7 +174,11 @@ function WingOverview({ day, wing }: { day: Day; wing: Wing }) {
   const live = useWard((s) => s.mode === 'live')
   const counts = census(day, t, wing.beds)
   const alerts = ranked(day, t, (a) => alertWing(a) === wing.code)
-  const groups = wing.wards.map((w) => ({ label: w.label, rooms: wing.beds.filter((r) => r.id.startsWith(w.prefix)) }))
+  // The ICU pod is the one ward named without its code.
+  const groups = wing.wards.map((w) => ({
+    label: w.label === 'ICU' ? say('ICU') : say('Ward {code}', { code: w.prefix }),
+    rooms: wing.beds.filter((r) => r.id.startsWith(w.prefix)),
+  }))
 
   return (
     <>
@@ -161,26 +187,25 @@ function WingOverview({ day, wing }: { day: Day; wing: Wing }) {
           <LiveIntro />
         ) : (
           <p>
-            A digital twin of a {BED_ROOMS.length.toLocaleString('en-US')}-bed hospital, replaying a simulated day. This is {wingName(wing)}: two wards and an
-            ICU. Colour the floor by beds, temperature, air or call lights; pick any room or piece of equipment for its day.
+            {say(
+              'A digital twin of a {beds}-bed hospital, replaying a simulated day. This is {wing}: two wards and an ICU. Colour the floor by beds, temperature, air or call lights; pick any room or piece of equipment for its day.',
+              { beds: BED_ROOMS.length.toLocaleString('en-US'), wing: wingName(wing) },
+            )}
           </p>
         )}
         <div className="intro__actions">
           {!live && <PlayButton />}
           <button className="btn btn--quiet" onClick={() => setScope(HOSPITAL)}>
-            <Building2 size={15} strokeWidth={2} aria-hidden="true" /> The whole hospital
+            <Building2 size={15} strokeWidth={2} aria-hidden="true" /> {say('The whole hospital')}
           </button>
         </div>
       </section>
 
       <section className="section">
         <h2 className="h2">
-          Beds at <time className="num">{clock(t)}</time>
+          {say('Beds at')} <time className="num">{clock(t)}</time>
         </h2>
-        <p className="lede">
-          <strong className="num">{counts.occupied}</strong> of {wing.beds.length} occupied. {counts.ready} ready for a patient, {counts.cleaning} being
-          cleaned, {counts.dirty} waiting for cleaning.
-        </p>
+        <Lede counts={counts} beds={wing.beds.length} />
         <div className="board">
           {groups.map((g) => (
             <div key={g.label} className="board__group">
@@ -195,8 +220,8 @@ function WingOverview({ day, wing }: { day: Day; wing: Wing }) {
                       className="board__cell"
                       style={{ background: s ? BED[s.state].soft : undefined, borderColor: s ? BED[s.state].strong : undefined }}
                       onClick={() => select({ type: 'room', id: r.id })}
-                      aria-label={`${r.id}: ${s ? BED_LABEL[s.state] : 'unknown'}${call ? ', call light on' : ''}`}
-                      title={`${r.id} · ${s ? BED_LABEL[s.state] : ''}`}
+                      aria-label={say(call ? '{room}: {state}, call light on' : '{room}: {state}', { room: r.id, state: s ? bedLabel(s.state) : say('unknown') })}
+                      title={`${r.id} · ${s ? bedLabel(s.state) : ''}`}
                     >
                       <span className="board__id">{r.id.slice(2)}</span>
                       {call && <i className="board__call" aria-hidden="true" />}
@@ -211,7 +236,7 @@ function WingOverview({ day, wing }: { day: Day; wing: Wing }) {
           {STATES.map((s) => (
             <li key={s} className="keys__item">
               <i className="keys__swatch" style={{ background: BED[s].soft, borderColor: BED[s].strong }} />
-              {BED_LABEL[s]} <span className="num keys__n">{counts[s]}</span>
+              {bedLabel(s)} <span className="num keys__n">{counts[s]}</span>
             </li>
           ))}
         </ul>
@@ -219,13 +244,16 @@ function WingOverview({ day, wing }: { day: Day; wing: Wing }) {
 
       <section className="section">
         <h2 className="h2">
-          Needs attention <span className="count num">{alerts.length}</span>
+          {say('Needs attention')} <span className="count num">{alerts.length}</span>
         </h2>
         {alerts.length === 0 ? (
           <p className="empty">
             {!live && wing.code === STORY
-              ? `Nothing is flagged at ${clock(t)}. Drag the timeline into the afternoon: discharges, a warm room and a low pump battery all land between 13:00 and 16:00.`
-              : `Nothing is flagged here at ${clock(t)}.`}
+              ? say(
+                  'Nothing is flagged at {time}. Drag the timeline into the afternoon: discharges, a warm room and a low pump battery all land between 13:00 and 16:00.',
+                  { time: clock(t) },
+                )
+              : say('Nothing is flagged here at {time}.', { time: clock(t) })}
           </p>
         ) : (
           <ul className="alerts">
@@ -237,7 +265,7 @@ function WingOverview({ day, wing }: { day: Day; wing: Wing }) {
       </section>
 
       <section className="section">
-        <h2 className="h2">Equipment</h2>
+        <h2 className="h2">{say('Equipment')}</h2>
         <Fleet t={t} assets={day.assets.filter((a) => a.wing === wing.code)} />
       </section>
     </>
@@ -265,7 +293,10 @@ function LevelOverview({ day, level }: { day: Day; level: number }) {
           <LiveIntro />
         ) : (
           <p>
-            Level {level} of the hospital: six wings of two wards and an ICU, {beds.length} beds in all, joined by glazed links. Pick a wing to go in.
+            {say('Level {level} of the hospital: six wings of two wards and an ICU, {beds} beds in all, joined by glazed links. Pick a wing to go in.', {
+              level,
+              beds: beds.length,
+            })}
           </p>
         )}
         {!live && (
@@ -277,12 +308,9 @@ function LevelOverview({ day, level }: { day: Day; level: number }) {
 
       <section className="section">
         <h2 className="h2">
-          Beds at <time className="num">{clock(t)}</time>
+          {say('Beds at')} <time className="num">{clock(t)}</time>
         </h2>
-        <p className="lede">
-          <strong className="num">{counts.occupied}</strong> of {beds.length} occupied. {counts.ready} ready for a patient, {counts.cleaning} being cleaned,{' '}
-          {counts.dirty} waiting for cleaning.
-        </p>
+        <Lede counts={counts} beds={beds.length} />
         <div className="levels__wings levels__wings--level">
           {wings.map((w) => (
             <WingChip key={w.code} wing={w} summary={summaries.get(w.code)!} />
@@ -292,10 +320,10 @@ function LevelOverview({ day, level }: { day: Day; level: number }) {
 
       <section className="section">
         <h2 className="h2">
-          Needs attention <span className="count num">{alerts.length}</span>
+          {say('Needs attention')} <span className="count num">{alerts.length}</span>
         </h2>
         {alerts.length === 0 ? (
-          <p className="empty">Nothing is flagged on level {level} at {clock(t)}.</p>
+          <p className="empty">{say('Nothing is flagged on level {level} at {time}.', { level, time: clock(t) })}</p>
         ) : (
           <>
             <ul className="alerts">
@@ -304,16 +332,14 @@ function LevelOverview({ day, level }: { day: Day; level: number }) {
               ))}
             </ul>
             {alerts.length > SHOWN && (
-              <p className="small">
-                The worst {SHOWN} of {alerts.length}. Each wing lists all of its own.
-              </p>
+              <p className="small">{say('The worst {shown} of {all}. Each wing lists all of its own.', { shown: SHOWN, all: alerts.length })}</p>
             )}
           </>
         )}
       </section>
 
       <section className="section">
-        <h2 className="h2">Equipment</h2>
+        <h2 className="h2">{say('Equipment')}</h2>
         <Fleet t={t} assets={day.assets.filter((a) => codes.has(a.wing))} />
       </section>
     </>
@@ -336,8 +362,10 @@ function HospitalOverview({ day }: { day: Day }) {
           <LiveIntro />
         ) : (
           <p>
-            The whole hospital: six levels of six wings, with {ROOMS.length.toLocaleString('en-US')} rooms, {BED_ROOMS.length.toLocaleString('en-US')} beds and{' '}
-            {day.assets.length.toLocaleString('en-US')} tracked pieces of equipment. The levels are drawn apart so every floor shows. Pick a wing to go in.
+            {say(
+              'The whole hospital: six levels of six wings, with {rooms} rooms, {beds} beds and {assets} tracked pieces of equipment. The levels are drawn apart so every floor shows. Pick a wing to go in.',
+              { rooms: ROOMS.length.toLocaleString('en-US'), beds: BED_ROOMS.length.toLocaleString('en-US'), assets: day.assets.length.toLocaleString('en-US') },
+            )}
           </p>
         )}
         {!live && (
@@ -349,17 +377,14 @@ function HospitalOverview({ day }: { day: Day }) {
 
       <section className="section">
         <h2 className="h2">
-          Beds at <time className="num">{clock(t)}</time>
+          {say('Beds at')} <time className="num">{clock(t)}</time>
         </h2>
-        <p className="lede">
-          <strong className="num">{counts.occupied.toLocaleString('en-US')}</strong> of {BED_ROOMS.length.toLocaleString('en-US')} occupied. {counts.ready} ready
-          for a patient, {counts.cleaning} being cleaned, {counts.dirty} waiting for cleaning.
-        </p>
+        <Lede counts={counts} beds={BED_ROOMS.length} />
         <ul className="levels">
           {[...LEVELS].reverse().map((level) => (
             <li key={level} className="levels__row">
               <button className="link levels__label" onClick={() => setScope(levelScope(level))}>
-                Level {level}
+                {say('Level {level}', { level })}
               </button>
               <span className="levels__wings">
                 {WINGS.filter((w) => w.level === level).map((w) => (
@@ -373,10 +398,10 @@ function HospitalOverview({ day }: { day: Day }) {
 
       <section className="section">
         <h2 className="h2">
-          Needs attention <span className="count num">{alerts.length}</span>
+          {say('Needs attention')} <span className="count num">{alerts.length}</span>
         </h2>
         {alerts.length === 0 ? (
-          <p className="empty">Nothing is flagged anywhere at {clock(t)}.</p>
+          <p className="empty">{say('Nothing is flagged anywhere at {time}.', { time: clock(t) })}</p>
         ) : (
           <>
             <ul className="alerts">
@@ -385,16 +410,14 @@ function HospitalOverview({ day }: { day: Day }) {
               ))}
             </ul>
             {alerts.length > SHOWN && (
-              <p className="small">
-                The worst {SHOWN} of {alerts.length}. Each wing lists all of its own.
-              </p>
+              <p className="small">{say('The worst {shown} of {all}. Each wing lists all of its own.', { shown: SHOWN, all: alerts.length })}</p>
             )}
           </>
         )}
       </section>
 
       <section className="section">
-        <h2 className="h2">Equipment</h2>
+        <h2 className="h2">{say('Equipment')}</h2>
         <Fleet t={t} assets={day.assets} />
       </section>
     </>
@@ -409,8 +432,18 @@ export function WingChip({ wing, summary }: { wing: Wing; summary: WingSummary }
       className={`chip${summary.critical ? ' chip--critical' : ''}`}
       style={{ ['--full' as string]: (summary.occupied / summary.beds).toFixed(2) }}
       onClick={() => setScope(wing.code)}
-      aria-label={`${wingName(wing)}: ${summary.occupied} of ${summary.beds} beds occupied, ${summary.alerts} ${summary.alerts === 1 ? 'alert' : 'alerts'}`}
-      title={`${wingName(wing)} · ${summary.occupied} of ${summary.beds} occupied · ${summary.alerts} alerts`}
+      aria-label={say('{wing}: {occupied} of {beds} beds occupied, {alerts}', {
+        wing: wingName(wing),
+        occupied: summary.occupied,
+        beds: summary.beds,
+        alerts: plural(summary.alerts, '{n} alert', '{n} alerts'),
+      })}
+      title={say('{wing} · {occupied} of {beds} occupied · {alerts}', {
+        wing: wingName(wing),
+        occupied: summary.occupied,
+        beds: summary.beds,
+        alerts: plural(summary.alerts, '{n} alert', '{n} alerts'),
+      })}
     >
       <span className="num">{wing.code}</span>
     </button>
@@ -426,13 +459,14 @@ function LiveIntro() {
     <>
       <p>
         {MOCK
-          ? 'A digital twin of a hospital, fed live: a mock server streams the simulated day as events, a simulated minute each second. '
-          : 'A digital twin of a hospital, built from the events of a live feed. '}
-        The floors hold only what has arrived, so nothing from later in the day is known.
+          ? say('A digital twin of a hospital, fed live: a mock server streams the simulated day as events, a simulated minute each second.')
+          : say('A digital twin of a hospital, built from the events of a live feed.')}{' '}
+        {say('The floors hold only what has arrived, so nothing from later in the day is known.')}
       </p>
       {MOCK && (
-        <button className="btn" onClick={() => outage(4000)} disabled={!up}>
-          <Unplug size={15} strokeWidth={2} aria-hidden="true" /> Take the server down for 4 seconds
+        // The mock server's code loads with live mode, never before.
+        <button className="btn" onClick={() => void import('../live/mock').then((m) => m.outage(4000))} disabled={!up}>
+          <Unplug size={15} strokeWidth={2} aria-hidden="true" /> {say('Take the server down for 4 seconds')}
         </button>
       )}
     </>
@@ -447,14 +481,14 @@ function AlertRow({ alert, day, t, onPick, named }: { alert: Alert; day: Day; t:
   const where = named && wing && !alert.target.id.includes(wing) ? `${alert.target.id} · ${wing}` : alert.target.id
   const body = (
     <>
-      <Icon className="alert__icon" size={16} strokeWidth={2} style={{ color: SEVERITY[severity] }} aria-label={severity} />
+      <Icon className="alert__icon" size={16} strokeWidth={2} style={{ color: SEVERITY[severity] }} aria-label={say(severity)} />
       <span className="alert__body">
         <span className="alert__title">
-          {alert.title} <span className="alert__where num">{where}</span>
+          {alertTitle(alert)} <span className="alert__where num">{where}</span>
         </span>
         <span className="alert__detail">{describe(alert, day, t)}</span>
       </span>
-      <span className="alert__age num" aria-label={`flagged at ${clock(alert.from)}`}>
+      <span className="alert__age num" aria-label={say('flagged at {time}', { time: clock(alert.from) })}>
         {clock(alert.from)}
       </span>
     </>
@@ -468,13 +502,19 @@ function Fleet({ t, assets }: { t: number; assets: Asset[] }) {
   const select = useWard((s) => s.select)
   return (
     <table className="fleet">
-      <caption className="fleet__note">Away means charging, or waiting in the soiled utility to be cleaned.</caption>
+      <caption className="fleet__note">{say('Away means charging, or waiting in the soiled utility to be cleaned.')}</caption>
       <thead>
         <tr>
-          <th scope="col">Type</th>
-          <th scope="col" className="num">In use</th>
-          <th scope="col" className="num">Free</th>
-          <th scope="col" className="num">Away</th>
+          <th scope="col">{say('Type')}</th>
+          <th scope="col" className="num">
+            {say('In use')}
+          </th>
+          <th scope="col" className="num">
+            {say('Free')}
+          </th>
+          <th scope="col" className="num">
+            {say('Away')}
+          </th>
         </tr>
       </thead>
       <tbody>
@@ -489,16 +529,16 @@ function Fleet({ t, assets }: { t: number; assets: Asset[] }) {
             <tr key={k}>
               <th scope="row">
                 {firstFree ? (
-                  <button className="link" onClick={() => select({ type: 'asset', id: firstFree.id })} title={`Show a free ${ASSET_LABEL[k].toLowerCase()}`}>
-                    {ASSET_LABEL[k]}
+                  <button className="link" onClick={() => select({ type: 'asset', id: firstFree.id })} title={say('Show a free {kind}', { kind: assetLabel(k).toLowerCase() })}>
+                    {assetLabel(k)}
                   </button>
                 ) : (
-                  ASSET_LABEL[k]
+                  assetLabel(k)
                 )}
               </th>
               <td className="num">{inUse.toLocaleString('en-US')}</td>
               <td className="num">{free.toLocaleString('en-US')}</td>
-              <td className="num" title="Charging or waiting for cleaning">
+              <td className="num" title={say('Charging or waiting for cleaning')}>
                 {away.toLocaleString('en-US')}
               </td>
             </tr>
@@ -515,7 +555,7 @@ function Back() {
   const select = useWard((s) => s.select)
   return (
     <button className="back" onClick={() => select(null)}>
-      <ArrowLeft size={16} strokeWidth={1.75} aria-hidden="true" /> The whole wing
+      <ArrowLeft className="back__arrow" size={16} strokeWidth={1.75} aria-hidden="true" /> {say('The whole wing')}
     </button>
   )
 }
@@ -549,33 +589,37 @@ function RoomDetail({ day, id }: { day: Day; id: string }) {
       <section className="section">
         <Back />
         <h2 className="title">
-          <span className="num">{isBed ? room.id : room.name}</span>
-          {isBed && <span className="title__sub">{room.kind === 'icu' ? 'ICU bay' : 'Single patient room'}</span>}
+          <span className="num">{roomTitle(room)}</span>
+          {isBed && <span className="title__sub">{room.kind === 'icu' ? say('ICU bay') : say('Single patient room')}</span>}
         </h2>
         {isBed && bed && (
           <>
             <p className="status">
               <i className="status__dot" style={{ background: BED[bed.state].strong }} />
-              <strong>{BED_LABEL[bed.state]}</strong>
+              <strong>{bedLabel(bed.state)}</strong>
               <span className="muted">
                 {' '}
-                since {bed.from === 0 ? 'before midnight' : clock(bed.from)}
-                {bed.state === 'occupied' && bed.acuity ? `, acuity ${bed.acuity} of 4` : ''}
+                {bed.from === 0 ? say('since before midnight') : say('since {time}', { time: clock(bed.from) })}
+                {bed.state === 'occupied' && bed.acuity ? say(', acuity {n} of 4', { n: bed.acuity }) : ''}
               </span>
             </p>
-            {bed.note && <p className="note">{bed.note}.</p>}
+            {bed.note && <p className="note">{say(bed.note)}.</p>}
             <StateStrip
               t={t}
-              label={`Bed states through the day: ${spans.map((s) => `${BED_LABEL[s.state]} ${clock(s.from)} to ${until(s.to)}`).join('; ')}`}
-              parts={spans.map((s) => ({ from: s.from, to: Number.isFinite(s.to) ? s.to : t, color: BED[s.state].soft, title: `${BED_LABEL[s.state]}, ${clock(s.from)}–${until(s.to)}` }))}
+              label={say('Bed states through the day: {states}', {
+                states: spans.map((s) => say('{state} {from} to {to}', { state: bedLabel(s.state), from: clock(s.from), to: until(s.to) })).join('; '),
+              })}
+              parts={spans.map((s) => ({ from: s.from, to: Number.isFinite(s.to) ? s.to : t, color: BED[s.state].soft, title: `${bedLabel(s.state)}, ${clock(s.from)}–${until(s.to)}` }))}
             />
             {turnaround && (
               <p className="small">
-                Turnaround today: vacated {clock(turnaround.vacated)},{' '}
                 {Number.isNaN(turnaround.ready)
-                  ? `not ready yet (${duration(t - turnaround.vacated)} so far)`
-                  : `ready ${clock(turnaround.ready)}, ${duration(turnaround.ready - turnaround.vacated)} out of use`}
-                .
+                  ? say('Turnaround today: vacated {vacated}, not ready yet ({wait} so far).', { vacated: clock(turnaround.vacated), wait: duration(t - turnaround.vacated) })
+                  : say('Turnaround today: vacated {vacated}, ready {ready}, {wait} out of use.', {
+                      vacated: clock(turnaround.vacated),
+                      ready: clock(turnaround.ready),
+                      wait: duration(turnaround.ready - turnaround.vacated),
+                    })}
               </p>
             )}
           </>
@@ -590,43 +634,45 @@ function RoomDetail({ day, id }: { day: Day; id: string }) {
       </section>
 
       <section className="section">
-        <h2 className="h2">Environment</h2>
+        <h2 className="h2">{say('Environment')}</h2>
         <div className="reading">
-          <span className="reading__label">Temperature</span>
-          <span className="reading__value num">{temp.toFixed(1)} °C</span>
+          <span className="reading__label">{say('Temperature')}</span>
+          <span className="reading__value num">{celsius(temp)}</span>
         </div>
-        <DayChart series={env.temp} t={t} min={19} max={28} threshold={25.5} label="Temperature" format={(v) => `${v.toFixed(1)} °C`} />
+        <DayChart series={env.temp} t={t} min={19} max={28} threshold={25.5} label={say('Temperature')} format={celsius} />
         <div className="reading">
           <span className="reading__label">CO₂</span>
-          <span className="reading__value num">{Math.round(co2).toLocaleString('en-US')} ppm</span>
+          <span className="reading__value num">{ppm(co2)}</span>
         </div>
-        <DayChart series={env.co2} t={t} min={350} max={1400} threshold={1000} label="CO₂" format={(v) => `${Math.round(v).toLocaleString('en-US')} ppm`} />
+        <DayChart series={env.co2} t={t} min={350} max={1400} threshold={1000} label="CO₂" format={ppm} />
       </section>
 
       {isBed && (
         <section className="section">
-          <h2 className="h2">Call light</h2>
+          <h2 className="h2">{say('Call light')}</h2>
           {call ? (
             <p className="status">
               <BellRing size={15} strokeWidth={2} style={{ color: t - call.at > 5 ? SEVERITY.critical : SEVERITY.warning }} aria-hidden="true" />
-              <strong>On for {duration(Math.max(1, t - call.at))}</strong>
-              <span className="muted"> since {clock(call.at)}</span>
+              <strong>{say('On for {wait}', { wait: duration(Math.max(1, t - call.at)) })}</strong>
+              <span className="muted"> {say('since {time}', { time: clock(call.at) })}</span>
             </p>
           ) : (
-            <p className="small">Not on now.</p>
+            <p className="small">{say('Not on now.')}</p>
           )}
           <p className="small">
             {calls.length === 0
-              ? 'No calls yet today.'
-              : `${calls.length} ${calls.length === 1 ? 'call' : 'calls'} so far today, longest wait ${Math.max(...calls.map((c) => Math.min(c.wait, t - c.at))).toFixed(1)} min.`}
+              ? say('No calls yet today.')
+              : plural(calls.length, '{n} call so far today, longest wait {wait} min.', '{n} calls so far today, longest wait {wait} min.', {
+                  wait: Math.max(...calls.map((c) => Math.min(c.wait, t - c.at))).toFixed(1),
+                })}
           </p>
         </section>
       )}
 
       <section className="section">
-        <h2 className="h2">Equipment here</h2>
+        <h2 className="h2">{say('Equipment here')}</h2>
         {here.length === 0 ? (
-          <p className="small">No tracked equipment in this room at {clock(t)}.</p>
+          <p className="small">{say('No tracked equipment in this room at {time}.', { time: clock(t) })}</p>
         ) : (
           <ul className="things">
             {here.map((a) => {
@@ -637,10 +683,10 @@ function RoomDetail({ day, id }: { day: Day; id: string }) {
                   <button className="thing" onClick={() => select({ type: 'asset', id: a.id })}>
                     <i className="thing__dot" style={{ background: ASSET_STATUS[st.status] }} />
                     <span className="num thing__id">{a.id}</span>
-                    <span className="thing__kind">{ASSET_LABEL[a.kind]}</span>
+                    <span className="thing__kind">{assetLabel(a.kind)}</span>
                     <span className="thing__meta">
-                      {batt !== undefined && batt < 20 && <BatteryLow size={14} strokeWidth={2} style={{ color: SEVERITY.warning }} aria-label="Battery low" />}
-                      {ASSET_STATUS_LABEL[st.status]}
+                      {batt !== undefined && batt < 20 && <BatteryLow size={14} strokeWidth={2} style={{ color: SEVERITY.warning }} aria-label={say('Battery low')} />}
+                      {statusLabel(st.status)}
                     </span>
                   </button>
                 </li>
@@ -670,7 +716,7 @@ function Nearest({ room }: { room: Room }) {
     const { nearestFree, routeReach } = await import('../lib/wayfinding')
     const { day, t } = useWard.getState()
     const found = day ? nearestFree(day, t, room, kind) : undefined
-    setNone(found ? null : `No ${ASSET_LABEL[kind].toLowerCase()} is free anywhere in the hospital at ${clock(t)}.`)
+    setNone(found ? null : say('No {kind} is free anywhere in the hospital at {time}.', { kind: assetLabel(kind).toLowerCase(), time: clock(t) }))
     if (!found) return showRoute(null)
     // Wide enough to hold the whole way: this wing, its level, or the whole hospital when a lift is involved.
     const reach = routeReach(found)
@@ -680,20 +726,25 @@ function Nearest({ room }: { room: Room }) {
   const at = route ? ROOM_BY_ID[route.at] : undefined
   return (
     <section className="section">
-      <h2 className="h2">Nearest free</h2>
+      <h2 className="h2">{say('Nearest free')}</h2>
       <div className="fetch">
         {kinds.map((k) => (
           <button key={k} className="btn btn--quiet btn--small" aria-pressed={route ? route.asset.startsWith(PREFIX[k]) : false} onClick={() => void find(k)}>
-            {ASSET_LABEL[k]}
+            {assetLabel(k)}
           </button>
         ))}
       </div>
       {route && at && (
         <p className="small route" role="status">
-          <strong className="num">{route.asset}</strong> in the {at.name.toLowerCase()}
-          {at.wing !== room.wing ? `, ${wingName(WING_BY_CODE[at.wing])}` : ''}: {Math.round(route.metres)} m, {walking(route.seconds)}.{' '}
+          <strong className="num">{route.asset}</strong>{' '}
+          {say(at.wing === room.wing ? 'in the {place}: {metres} m, {walk}.' : 'in the {place}, {wing}: {metres} m, {walk}.', {
+            place: lowerFirst(roomName(at.id)),
+            wing: wingName(WING_BY_CODE[at.wing]),
+            metres: Math.round(route.metres),
+            walk: walking(route.seconds),
+          })}{' '}
           <button className="link" onClick={() => showRoute(null)}>
-            Clear the way
+            {say('Clear the way')}
           </button>
         </p>
       )}
@@ -723,15 +774,15 @@ function AssetDetail({ day, id }: { day: Day; id: string }) {
         <Back />
         <h2 className="title">
           <span className="num">{asset.id}</span>
-          <span className="title__sub">{ASSET_LABEL[asset.kind]}</span>
+          <span className="title__sub">{assetLabel(asset.kind)}</span>
         </h2>
         <p className="status">
           <i className="status__dot" style={{ background: ASSET_STATUS[now.status] }} />
-          <strong>{ASSET_STATUS_LABEL[now.status]}</strong>
-          <span className="muted"> since {now.from === 0 ? 'before midnight' : clock(now.from)}</span>
+          <strong>{statusLabel(now.status)}</strong>
+          <span className="muted"> {now.from === 0 ? say('since before midnight') : say('since {time}', { time: clock(now.from) })}</span>
         </p>
         <p className="small">
-          In{' '}
+          {say('In')}{' '}
           <button className="link" onClick={() => select({ type: 'room', id: now.loc })}>
             {roomName(now.loc)}
           </button>
@@ -748,27 +799,27 @@ function AssetDetail({ day, id }: { day: Day; id: string }) {
 
       {asset.battery && batt !== undefined && (
         <section className="section">
-          <h2 className="h2">Battery</h2>
+          <h2 className="h2">{say('Battery')}</h2>
           <div className="reading">
-            <span className="reading__label">Charge</span>
+            <span className="reading__label">{say('Charge')}</span>
             <span className="reading__value num">{batt} %</span>
           </div>
-          <DayChart series={asset.battery} t={t} min={0} max={100} threshold={20} label="Battery" format={(v) => `${Math.round(v)} %`} />
+          <DayChart series={asset.battery} t={t} min={0} max={100} threshold={20} label={say('Battery')} format={(v) => `${Math.round(v)} %`} />
         </section>
       )}
 
       <section className="section">
-        <h2 className="h2">Where it has been</h2>
+        <h2 className="h2">{say('Where it has been')}</h2>
         <ol className="moves">
           {moves.map((s) => (
             <li key={s.from} className="moves__item">
               <span className="num moves__time">
-                {clock(s.from)}–{s.to > t ? 'now' : clock(s.to)}
+                {clock(s.from)}–{s.to > t ? say('now') : clock(s.to)}
               </span>
               <button className="link" onClick={() => select({ type: 'room', id: s.loc })}>
                 {roomName(s.loc)}
               </button>
-              <span className="muted">{ASSET_STATUS_LABEL[s.status].toLowerCase()}</span>
+              <span className="muted">{statusLabel(s.status).toLowerCase()}</span>
             </li>
           ))}
         </ol>

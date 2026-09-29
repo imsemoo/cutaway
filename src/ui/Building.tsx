@@ -1,5 +1,7 @@
 import { Building2 } from 'lucide-react'
-import { LEVELS, WINGS, wingName } from '../data/floorplan'
+import { LEVELS, WINGS } from '../data/floorplan'
+import { plural, say } from '../i18n'
+import { wingName } from '../lib/query'
 import { HOSPITAL, levelScope, scopeLevel } from '../state/scope'
 import { useWard } from '../state/store'
 import { wingSummaries } from './summary'
@@ -23,15 +25,22 @@ export function Building() {
   const summaries = day && complete ? wingSummaries(day, t) : undefined
 
   return (
-    <nav className="building" aria-label="Wings of the hospital">
+    <nav className="building" aria-label={say('Wings of the hospital')}>
       <button className="building__all" aria-pressed={scope === HOSPITAL} onClick={() => setScope(HOSPITAL)}>
         <Building2 size={14} strokeWidth={1.75} aria-hidden="true" />
-        <span>All levels</span>
+        <span>{say('All levels')}</span>
       </button>
-      <div className="building__grid">
+      {/* A map of the building: the A wing stays west, in either language. */}
+      <div className="building__grid" dir="ltr">
         {[...LEVELS].reverse().map((level) => (
           <div key={level} className={`building__level${scopeLevel(scope) === level ? ' is-here' : ''}`}>
-            <button className="building__n num" tabIndex={-1} onClick={() => setScope(levelScope(level))} aria-label={`Level ${level}`} title={`Level ${level}: all six wings`}>
+            <button
+              className="building__n num"
+              tabIndex={-1}
+              onClick={() => setScope(levelScope(level))}
+              aria-label={say('Level {level}', { level })}
+              title={say('Level {level}: all six wings', { level })}
+            >
               {level}
             </button>
             {WINGS.filter((w) => w.level === level).map((w) => {
@@ -43,8 +52,25 @@ export function Building() {
                   className={`building__cell${scope === w.code ? ' is-here' : ''}${s?.critical ? ' is-critical' : ''}`}
                   style={{ ['--full' as string]: s ? (s.occupied / s.beds).toFixed(2) : 0 }}
                   onClick={() => setScope(w.code)}
-                  aria-label={s ? `${wingName(w)}: ${s.occupied} of ${s.beds} beds occupied${s.critical ? ', something critical open' : ''}` : wingName(w)}
-                  title={s ? `${wingName(w)} · ${s.occupied} of ${s.beds} occupied · ${s.alerts} alerts` : wingName(w)}
+                  aria-label={
+                    s
+                      ? say(s.critical ? '{wing}: {occupied} of {beds} beds occupied, something critical open' : '{wing}: {occupied} of {beds} beds occupied', {
+                          wing: wingName(w),
+                          occupied: s.occupied,
+                          beds: s.beds,
+                        })
+                      : wingName(w)
+                  }
+                  title={
+                    s
+                      ? say('{wing} · {occupied} of {beds} occupied · {alerts}', {
+                          wing: wingName(w),
+                          occupied: s.occupied,
+                          beds: s.beds,
+                          alerts: plural(s.alerts, '{n} alert', '{n} alerts'),
+                        })
+                      : wingName(w)
+                  }
                 />
               )
             })}

@@ -2,7 +2,8 @@ import { useLayoutEffect, useRef } from 'react'
 import { LEVELS, PLATE, ROOM_BY_ID, WING, center } from '../data/floorplan'
 import type { Day, Layer } from '../data/types'
 import { BED } from '../lib/colors'
-import { ASSET_LABEL, ASSET_STATUS_LABEL, BED_LABEL, activeCall, assetAt, bedAt, sample, walking } from '../lib/query'
+import { say } from '../i18n'
+import { activeCall, assetAt, assetLabel, bedAt, bedLabel, roomTitle, sample, statusLabel, walking } from '../lib/query'
 import { assetPositions } from '../lib/positions'
 import { RIM, levelY } from '../scene/layout'
 import { HOSPITAL, levelScope, scopeLevel, scopeWings } from '../state/scope'
@@ -25,6 +26,8 @@ export function Tags() {
   const selRoom = selection?.type === 'room' ? selection.id : undefined
   const selAsset = selection?.type === 'asset' ? day.assets.find((a) => a.id === selection.id) : undefined
   const assetPos = selAsset ? assetPositions(day, t).get(selAsset.id) : undefined
+  // "4D wing" or "الجناح 4D": the words around the code come from the translation, and give way on a phone.
+  const [before, after] = say('{code} wing').split('{code}')
 
   return (
     <div className="tags" aria-hidden="true">
@@ -32,15 +35,16 @@ export function Tags() {
         scopeWings(levelScope(scopeLevel(scope)!)).map((w) => (
           <Tag key={`wing-${w.code}`} slot={`wing-${w.code}`} x={w.x + WING.w / 2} y={levelY(w.level) + 3.2} z={w.z} quiet>
             <span className="tag__id">
+              <span className="tag__more">{before}</span>
               {w.code}
-              <span className="tag__more"> wing</span>
+              <span className="tag__more">{after}</span>
             </span>
           </Tag>
         ))}
       {scope === HOSPITAL &&
         LEVELS.map((level) => (
           <Tag key={`level-${level}`} slot={`level-${level}`} x={-RIM} y={levelY(level)} z={PLATE.d + RIM} quiet>
-            <span className="tag__id">Level {level}</span>
+            <span className="tag__id">{say('Level {level}', { level })}</span>
           </Tag>
         ))}
       {selRoom && <RoomTag key="sel" slot="sel" id={selRoom} day={day} t={t} layer={layer} plan={plan} strong />}
@@ -55,7 +59,7 @@ export function Tags() {
         <Tag slot="asset" x={assetPos.x} y={levelY(ROOM_BY_ID[assetAt(selAsset, t).loc].level) + (plan ? 0.5 : 2.4)} z={assetPos.z} strong>
           <span className="tag__id">{selAsset.id}</span>
           <span className="tag__meta">
-            {ASSET_LABEL[selAsset.kind]}, {ASSET_STATUS_LABEL[assetAt(selAsset, t).status].toLowerCase()}
+            {say('{kind}, {status}', { kind: assetLabel(selAsset.kind), status: statusLabel(assetAt(selAsset, t).status).toLowerCase() })}
           </span>
         </Tag>
       )}
@@ -67,25 +71,26 @@ function RoomTag({ slot, id, day, t, layer, plan, strong }: { slot: string; id: 
   const r = ROOM_BY_ID[id]
   if (!r) return null
   const c = center(r)
-  const isBed = r.kind === 'patient' || r.kind === 'icu'
   const bed = bedAt(day, id, t)
   const env = day.rooms[id]
   const call = activeCall(day, id, t)
   const metric =
     layer === 'temp'
-      ? `${sample(env.temp, t).toFixed(1)} °C`
+      ? say('{v} °C', { v: sample(env.temp, t).toFixed(1) })
       : layer === 'air'
-        ? `${Math.round(sample(env.co2, t)).toLocaleString('en-US')} ppm CO₂`
+        ? say('{v} ppm CO₂', { v: Math.round(sample(env.co2, t)).toLocaleString('en-US') })
         : layer === 'calls'
           ? call
-            ? `Call light, ${Math.max(0, t - call.at).toFixed(0)} min`
-            : 'No call light'
+            ? say('Call light, {n} min', { n: Math.max(0, t - call.at).toFixed(0) })
+            : say('No call light')
           : bed
-            ? BED_LABEL[bed.state]
-            : r.kind === 'station' ? 'Staff area' : 'Support space'
+            ? bedLabel(bed.state)
+            : r.kind === 'station'
+              ? say('Staff area')
+              : say('Support space')
   return (
     <Tag slot={slot} x={c.x} y={levelY(r.level) + (plan ? 0.5 : 3.1)} z={c.z} strong={strong}>
-      <span className="tag__id">{isBed ? r.id : r.name}</span>
+      <span className="tag__id">{roomTitle(r)}</span>
       <span className="tag__meta">
         {layer === 'beds' && bed && <i className="tag__dot" style={{ background: BED[bed.state].strong }} />}
         {metric}

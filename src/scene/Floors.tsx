@@ -4,6 +4,8 @@ import { BoxGeometry, Color, Matrix4, type InstancedMesh } from 'three'
 import { BatchedText, Text as TroikaText } from 'troika-three-text'
 import monoUrl from '@fontsource/fragment-mono/files/fragment-mono-latin-400-normal.woff?url'
 import sansUrl from '@fontsource/schibsted-grotesk/files/schibsted-grotesk-latin-600-normal.woff?url'
+import arabicUrl from '@fontsource/vazirmatn/files/vazirmatn-arabic-600-normal.woff?url'
+import { say, useLang } from '../i18n'
 import { ROOMS, WING_BY_CODE, isBed } from '../data/floorplan'
 import type { Day, Layer, Room } from '../data/types'
 import { BED, NEUTRAL_FLOOR, SUPPORT_FLOOR, callColor } from '../lib/colors'
@@ -49,6 +51,7 @@ export function Floors() {
   const setHover = useWard((s) => s.setHover)
   const select = useWard((s) => s.select)
   const plan = useWard((s) => s.view === 'plan')
+  const arabic = useLang((s) => s.lang === 'ar')
   const invalidate = useThree((s) => s.invalidate)
 
   // The rooms in scope, packed into the first instances; slots maps an instance back to its room.
@@ -112,7 +115,7 @@ export function Floors() {
       >
         <meshStandardMaterial roughness={0.95} />
       </instancedMesh>
-      {isWing(scope) && <RoomLabels key={scope} wing={scope} plan={plan} />}
+      {isWing(scope) && <RoomLabels key={`${scope}-${arabic}`} wing={scope} plan={plan} arabic={arabic} />}
     </group>
   )
 }
@@ -121,8 +124,9 @@ export function Floors() {
   Room numbers set into the floor, like tags on a plan. The wing's 38
   labels in two batched meshes, one per typeface: two draw calls instead of
   38. A level or the whole hospital is seen from too far to read them, so they have none.
+  In Arabic the room names are set in Vazirmatn, unspaced and in their own case.
 */
-function RoomLabels({ wing, plan }: { wing: string; plan: boolean }) {
+function RoomLabels({ wing, plan, arabic }: { wing: string; plan: boolean; arabic: boolean }) {
   const invalidate = useThree((s) => s.invalidate)
   const batches = useMemo(() => {
     const mono = new BatchedText()
@@ -131,13 +135,13 @@ function RoomLabels({ wing, plan }: { wing: string; plan: boolean }) {
     const members = rooms.map((r) => {
       const bed = isBed(r)
       const t = new TroikaText()
-      t.text = bed ? r.id : r.name.toUpperCase()
-      t.font = bed ? monoUrl : sansUrl
+      t.text = bed ? r.id : arabic ? say(r.name) : r.name.toUpperCase()
+      t.font = bed ? monoUrl : arabic ? arabicUrl : sansUrl
       t.anchorX = 'center'
       t.anchorY = 'middle'
       t.textAlign = 'center'
       t.maxWidth = r.w - 0.6
-      t.letterSpacing = bed ? 0 : 0.06
+      t.letterSpacing = bed || arabic ? 0 : 0.06
       const z = bed ? (r.door?.side === 's' ? r.z + r.d - 1.05 : r.z + 1.05) : r.z + r.d / 2
       t.position.set(r.x + r.w / 2, 0, z)
       t.rotation.x = -Math.PI / 2
@@ -149,7 +153,7 @@ function RoomLabels({ wing, plan }: { wing: string; plan: boolean }) {
       b.raycast = () => undefined
     }
     return { mono, sans, members }
-  }, [wing])
+  }, [wing, arabic])
 
   useEffect(() => {
     for (const { t, bed } of batches.members) {

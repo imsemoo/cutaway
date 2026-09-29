@@ -1,23 +1,38 @@
-import type { Alert, Day, Severity } from '../data/types'
+import type { Alert, AlertKind, Day, Severity } from '../data/types'
+import { say } from '../i18n'
 import { batteryAt, clock, duration, sample } from './query'
+
+/** Each kind's title, in English; alertTitle gives it in the language on show. */
+export const ALERT_TITLE: Record<AlertKind, string> = {
+  temp: 'Room too warm',
+  co2: 'Air getting stale',
+  call: 'Call light unanswered',
+  dirty: 'Bed waiting for cleaning',
+  ready: 'Clean bed not assigned',
+  battery: 'Pump battery low',
+}
+export const alertTitle = (alert: Alert) => say(ALERT_TITLE[alert.kind])
 
 /** What an alert says at minute t: only what an operator could know by then. */
 export function describe(alert: Alert, day: Day, t: number): string {
-  const since = Math.max(0, t - alert.since)
+  const at = clock(alert.since)
+  const wait = duration(Math.max(0, t - alert.since))
   switch (alert.kind) {
     case 'temp':
-      return `${sample(day.rooms[alert.target.id].temp, t).toFixed(1)} °C now, limit 25.5 °C. Check the room's air handling.`
+      return say("{v} °C now, limit 25.5 °C. Check the room's air handling.", { v: sample(day.rooms[alert.target.id].temp, t).toFixed(1) })
     case 'co2':
-      return `${Math.round(sample(day.rooms[alert.target.id].co2, t)).toLocaleString('en-US')} ppm now, limit 1,000. Open up ventilation or thin out visitors.`
+      return say('{v} ppm now, limit 1,000. Open up ventilation or thin out visitors.', {
+        v: Math.round(sample(day.rooms[alert.target.id].co2, t)).toLocaleString('en-US'),
+      })
     case 'call':
-      return `Pressed at ${clock(alert.since)}, ${duration(since)} without an answer.`
+      return say('Pressed at {at}, {wait} without an answer.', { at, wait })
     case 'dirty':
-      return `Empty since ${clock(alert.since)}, ${duration(since)} without cleaning. The next admission cannot use it.`
+      return say('Empty since {at}, {wait} without cleaning. The next admission cannot use it.', { at, wait })
     case 'ready':
-      return `Clean since ${clock(alert.since)}, no patient assigned for ${duration(since)}.`
+      return say('Clean since {at}, no patient assigned for {wait}.', { at, wait })
     case 'battery': {
       const asset = day.assets.find((a) => a.id === alert.target.id)
-      return `${asset ? batteryAt(asset, t) : '?'} % and in use. Plug it into mains.`
+      return say('{v} % and in use. Plug it into mains.', { v: asset ? (batteryAt(asset, t) ?? '?') : '?' })
     }
   }
 }

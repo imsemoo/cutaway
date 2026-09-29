@@ -1,5 +1,7 @@
 import { History, Pause, Play, Radio } from 'lucide-react'
 import { useEffect, useMemo, useState } from 'react'
+import { plural, say } from '../i18n'
+import { alertTitle } from '../lib/alerts'
 import { SEVERITY } from '../lib/colors'
 import { alertWing, clock } from '../lib/query'
 import { HOSPITAL, scopeWings } from '../state/scope'
@@ -28,11 +30,12 @@ export function Timeline() {
     const on = new Set(scopeWings(scope).map((w) => w.code))
     return (day?.alerts ?? [])
       .filter((a) => (scope === HOSPITAL ? a.severity === 'critical' : on.has(alertWing(a) ?? '')))
-      .map((a) => ({ id: a.id, at: a.from, color: SEVERITY[a.severity], title: `${clock(a.from)} ${a.title} ${a.target.id}` }))
+      .map((a) => ({ id: a.id, at: a.from, color: SEVERITY[a.severity], title: `${clock(a.from)} ${alertTitle(a)} ${a.target.id}` }))
   }, [day, scope])
 
+  // Playback controls keep time running left to right in either language, as media players do.
   return (
-    <footer className="timeline" data-mode={mode}>
+    <footer className="timeline" data-mode={mode} dir="ltr">
       {live ? (
         <FeedDot />
       ) : (
@@ -42,7 +45,7 @@ export function Timeline() {
             if (!playing && t >= 1435) setT(0)
             setPlaying(!playing)
           }}
-          aria-label={playing ? 'Pause the replay' : 'Play the day'}
+          aria-label={playing ? say('Pause the replay') : say('Play the day')}
           disabled={!day}
         >
           {playing ? <Pause size={18} strokeWidth={2} aria-hidden="true" /> : <Play size={18} strokeWidth={2} aria-hidden="true" />}
@@ -76,8 +79,8 @@ export function Timeline() {
             setPlaying(false)
             setT(Number(e.target.value))
           }}
-          aria-label="Time of day"
-          aria-valuetext={live ? `${clock(t)}, live` : clock(t)}
+          aria-label={say('Time of day')}
+          aria-valuetext={live ? say('{time}, live', { time: clock(t) }) : clock(t)}
           disabled={!day || live}
         />
       </div>
@@ -85,19 +88,26 @@ export function Timeline() {
         {live ? (
           <FeedState />
         ) : (
-          <div className="seg seg--small" role="radiogroup" aria-label="Replay speed">
+          <div className="seg seg--small" role="radiogroup" aria-label={say('Replay speed')}>
             {SPEEDS.map((s) => (
-              <button key={s} role="radio" aria-checked={speed === s} className="seg__btn" onClick={() => setSpeed(s)} aria-label={`${s} simulated minutes per second`}>
-                <span className="num">{s === 60 ? '1 h' : `${s} min`}/s</span>
+              <button
+                key={s}
+                role="radio"
+                aria-checked={speed === s}
+                className="seg__btn"
+                onClick={() => setSpeed(s)}
+                aria-label={plural(s, '{n} simulated minute per second', '{n} simulated minutes per second')}
+              >
+                <span className="num">{s === 60 ? say('1 h/s') : say('{n} min/s', { n: s })}</span>
               </button>
             ))}
           </div>
         )}
-        <div className="seg seg--small seg--mode" role="radiogroup" aria-label="Data">
+        <div className="seg seg--small seg--mode" role="radiogroup" aria-label={say('Data')}>
           {MODES.map(({ id, label, icon: Icon }) => (
-            <button key={id} role="radio" aria-checked={mode === id} aria-label={label} title={label} className="seg__btn" onClick={() => setMode(id)}>
+            <button key={id} role="radio" aria-checked={mode === id} aria-label={say(label)} title={say(label)} className="seg__btn" onClick={() => setMode(id)}>
               <Icon size={14} strokeWidth={1.75} aria-hidden="true" />
-              <span>{label}</span>
+              <span>{say(label)}</span>
             </button>
           ))}
         </div>
@@ -125,16 +135,17 @@ function FeedState() {
 
   let said = ''
   let countdown = ''
-  if (feed.state === 'connecting') said = feed.attempt ? 'Reconnecting…' : 'Connecting…'
-  else if (feed.state === 'live') said = feed.caughtUp === undefined ? 'Live' : `Live, ${feed.caughtUp} missed ${feed.caughtUp === 1 ? 'event' : 'events'} replayed`
+  if (feed.state === 'connecting') said = feed.attempt ? say('Reconnecting…') : say('Connecting…')
+  else if (feed.state === 'live')
+    said = feed.caughtUp === undefined ? say('Live') : plural(feed.caughtUp, 'Live, {n} missed event replayed', 'Live, {n} missed events replayed')
   else if (feed.state === 'retrying') {
-    said = `Offline, retry ${feed.attempt}`
-    countdown = ` in ${Math.max(1, Math.ceil((feed.at - Date.now()) / 1000))} s`
+    said = say('Offline, retry {n}', { n: feed.attempt })
+    countdown = say('in {n} s', { n: Math.max(1, Math.ceil((feed.at - Date.now()) / 1000)) })
   }
   return (
-    <p className="feed" data-state={feed.state} title={said + countdown}>
+    <p className="feed" data-state={feed.state} title={countdown ? `${said} ${countdown}` : said}>
       <span role="status">{said}</span>
-      {countdown && <span aria-hidden="true">{countdown}</span>}
+      {countdown && <span aria-hidden="true"> {countdown}</span>}
     </p>
   )
 }

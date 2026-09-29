@@ -159,8 +159,6 @@ export const LINKS: Link[] = WINGS.flatMap((w) => {
   return [...along, across]
 })
 
-/** "Level 4, A wing": how a person names a wing. */
-export const wingName = (w: Wing) => `Level ${w.level}, ${w.code.slice(1)} wing`
 
 export const center = (r: Room) => ({ x: r.x + r.w / 2, z: r.z + r.d / 2 })
 

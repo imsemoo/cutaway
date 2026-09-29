@@ -1,5 +1,6 @@
-import { BED_ROOMS, ROOM_BY_ID, wingOfAsset } from '../data/floorplan'
-import type { Alert, Asset, AssetSpan, BedSpan, BedState, Day, Room } from '../data/types'
+import { BED_ROOMS, ROOM_BY_ID, isBed, wingOfAsset, type Wing } from '../data/floorplan'
+import type { Alert, Asset, AssetKind, AssetSpan, AssetStatus, BedSpan, BedState, Day, Room } from '../data/types'
+import { plural, say } from '../i18n'
 import { DAY_MIN, STEP } from '../sim/time'
 
 export const clock = (m: number) => {
@@ -7,15 +8,18 @@ export const clock = (m: number) => {
   return `${String(Math.floor(mm / 60) % 24).padStart(2, '0')}:${String(mm % 60).padStart(2, '0')}`
 }
 
+const minutes = (n: number) => plural(n, '{n} min', '{n} min')
+
 export const duration = (min: number) => {
   const m = Math.round(min)
-  if (m < 60) return `${m} min`
-  const h = Math.floor(m / 60)
-  return m % 60 ? `${h} h ${m % 60} min` : `${h} h`
+  if (m < 60) return minutes(m)
+  const hours = plural(Math.floor(m / 60), '{n} h', '{n} h')
+  return m % 60 ? say('{hours} {minutes}', { hours, minutes: minutes(m % 60) }) : hours
 }
 
 /** A walk as a person would say it: "40 s away", "3 min away". */
-export const walking = (seconds: number) => (seconds < 60 ? `${Math.max(5, Math.round(seconds / 5) * 5)} s away` : `${Math.round(seconds / 60)} min away`)
+export const walking = (seconds: number) =>
+  seconds < 60 ? plural(Math.max(5, Math.round(seconds / 5) * 5), '{n} s away', '{n} s away') : plural(Math.round(seconds / 60), '{n} min away', '{n} min away')
 
 export function spanAt<T extends { from: number; to: number }>(list: T[] | undefined, m: number): T | undefined {
   if (!list) return undefined
@@ -64,7 +68,18 @@ export function assetsIn(day: Day, roomId: string, m: number) {
   return day.assets.filter((a) => assetAt(a, m).loc === roomId)
 }
 
-export const roomName = (id: string) => ROOM_BY_ID[id]?.name ?? id
+/** "Level 4, A wing": how a person names a wing. */
+export const wingName = (w: Wing) => say('Level {level}, {wing} wing', { level: w.level, wing: w.code.slice(1) })
+
+/** A room's full name: "Patient room 4A09", "Equipment store". */
+function fullName(r: Room) {
+  if (r.kind === 'patient') return say('Patient room {id}', { id: r.id })
+  if (r.kind === 'icu') return say('ICU bay {id}', { id: r.id })
+  return say(r.name)
+}
+export const roomName = (id: string) => (ROOM_BY_ID[id] ? fullName(ROOM_BY_ID[id]) : id)
+/** A room as a label names it: a bed room by its number, any other by what it is. */
+export const roomTitle = (r: Room) => (isBed(r) ? r.id : say(r.name))
 
 /** The wing an alert belongs to: its room's, or its equipment's. */
 export const alertWing = (alert: Alert) => (alert.target.type === 'room' ? ROOM_BY_ID[alert.target.id]?.wing : wingOfAsset(alert.target.id))
@@ -91,3 +106,8 @@ export const ASSET_STATUS_LABEL = {
   'needs-cleaning': 'Needs cleaning',
   charging: 'Charging',
 } as const
+
+/** The labels in the language on show; the maps above are their English keys. */
+export const bedLabel = (s: BedState) => say(BED_LABEL[s])
+export const assetLabel = (k: AssetKind) => say(ASSET_LABEL[k])
+export const statusLabel = (s: AssetStatus) => say(ASSET_STATUS_LABEL[s])

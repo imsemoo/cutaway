@@ -18,8 +18,8 @@
   --crit: #c8241b;
   --warn: #b86e00;
   --ok: #157a4c;
-  --font: 'Schibsted Grotesk', system-ui, -apple-system, 'Segoe UI', sans-serif;
-  --mono: 'Fragment Mono', ui-monospace, 'SF Mono', Consolas, monospace;
+  --font: 'Schibsted Grotesk', 'Vazirmatn', system-ui, -apple-system, 'Segoe UI', sans-serif;
+  --mono: 'Fragment Mono', 'Vazirmatn', ui-monospace, 'SF Mono', Consolas, monospace;
   --r: 6px;
   --bar-h: 56px;
   --panel-w: 392px;
@@ -82,7 +82,7 @@ button {
 
 .skip {
   position: absolute;
-  left: 12px;
+  inset-inline-start: 12px;
   top: -40px;
   z-index: 50;
   padding: 8px 12px;
@@ -139,7 +139,7 @@ button {
   align-items: center;
   gap: 10px;
   min-width: 0;
-  margin-right: auto;
+  margin-inline-end: auto;
 }
 .brand__mark {
   width: 28px;
@@ -173,6 +173,27 @@ button {
   color: var(--text-2);
   font-size: 12px;
   white-space: nowrap;
+}
+
+/* The other language, named in itself. */
+.lang {
+  flex: none;
+  height: 28px;
+  padding: 0 10px;
+  border: 1px solid var(--line-2);
+  border-radius: var(--r);
+  background: var(--surface);
+  color: var(--text);
+  font: 500 13px/1 var(--font);
+  cursor: pointer;
+  transition: border-color 150ms ease-out;
+}
+.lang:hover {
+  border-color: var(--text-3);
+}
+/* "العربية" on the English page in the system's own Arabic, so an English visit never fetches Vazirmatn. */
+.lang:lang(ar) {
+  font-family: system-ui, -apple-system, 'Segoe UI', sans-serif;
 }
 
 /* Segmented controls: one shape everywhere. */
@@ -224,7 +245,7 @@ button {
 }
 .search__icon {
   position: absolute;
-  left: 10px;
+  inset-inline-start: 10px;
   top: 50%;
   translate: 0 -50%;
   color: var(--text-3);
@@ -254,7 +275,7 @@ button {
 }
 .search__key {
   position: absolute;
-  right: 8px;
+  inset-inline-end: 8px;
   top: 50%;
   translate: 0 -50%;
   padding: 0 5px;
@@ -295,7 +316,7 @@ button {
 .search__hint {
   color: var(--text-3);
   font-size: 12.5px;
-  text-align: right;
+  text-align: end;
 }
 .search__empty {
   padding: 8px;
@@ -348,7 +369,7 @@ button {
 
 .dock {
   position: absolute;
-  left: 16px;
+  inset-inline-start: 16px;
   bottom: 16px;
   display: grid;
   gap: 8px;
@@ -426,7 +447,7 @@ button {
 .tools {
   position: absolute;
   top: 12px;
-  right: 12px;
+  inset-inline-end: 12px;
   display: flex;
   align-items: center;
   gap: 10px;
@@ -500,7 +521,7 @@ button {
 .meter {
   position: absolute;
   top: 60px;
-  right: 12px;
+  inset-inline-end: 12px;
   padding: 4px 8px;
   border-radius: 4px;
   background: var(--text);
@@ -526,7 +547,7 @@ button {
 .rooms td {
   padding: 8px 12px;
   border-bottom: 1px solid var(--line);
-  text-align: left;
+  text-align: start;
   white-space: nowrap;
 }
 .rooms thead th {
@@ -540,7 +561,7 @@ button {
 }
 .rooms td.num,
 .rooms th.num {
-  text-align: right;
+  text-align: end;
 }
 .rooms tbody tr:hover {
   background: var(--surface-2);
@@ -695,7 +716,7 @@ button {
   overflow-y: auto;
   overscroll-behavior: contain;
   background: var(--surface);
-  border-left: 1px solid var(--line);
+  border-inline-start: 1px solid var(--line);
   scrollbar-width: thin;
   scrollbar-color: var(--line-2) transparent;
 }
@@ -786,7 +807,7 @@ button {
 .board__call {
   position: absolute;
   top: -3px;
-  right: -3px;
+  inset-inline-end: -3px;
   width: 9px;
   height: 9px;
   border-radius: 50%;
@@ -839,7 +860,7 @@ button {
   border: 1px solid var(--line);
   border-radius: var(--r);
   background: var(--surface);
-  text-align: left;
+  text-align: start;
   cursor: pointer;
   transition: border-color 150ms ease-out, background-color 150ms ease-out;
 }
@@ -865,7 +886,7 @@ button {
   font-weight: 500;
 }
 .alert__where {
-  margin-left: 4px;
+  margin-inline-start: 4px;
   font-family: var(--mono);
   font-size: 12.5px;
   font-weight: 400;
@@ -890,7 +911,7 @@ button {
 .fleet td {
   padding: 7px 0;
   border-bottom: 1px solid var(--line);
-  text-align: left;
+  text-align: start;
   font-weight: 400;
 }
 .fleet thead th {
@@ -901,7 +922,7 @@ button {
   border-bottom: 0;
 }
 .fleet .num {
-  text-align: right;
+  text-align: end;
   width: 56px;
 }
 .fleet__note {
@@ -909,7 +930,7 @@ button {
   padding-top: 10px;
   color: var(--text-3);
   font-size: 12px;
-  text-align: left;
+  text-align: start;
 }
 
 .intro {
@@ -928,7 +949,8 @@ button {
   align-items: center;
   gap: 8px;
   height: 34px;
-  padding: 0 14px 0 12px;
+  padding-block: 0;
+  padding-inline: 12px 14px;
   border: 0;
   border-radius: var(--r);
   background: var(--text);
@@ -979,7 +1001,8 @@ button {
   display: inline-flex;
   align-items: center;
   gap: 6px;
-  margin: -4px 0 10px -6px;
+  margin-block: -4px 10px;
+  margin-inline: -6px 0;
   padding: 4px 6px;
   border: 0;
   border-radius: 5px;
@@ -1121,7 +1144,7 @@ button {
   border: 1px solid var(--line);
   border-radius: var(--r);
   background: var(--surface);
-  text-align: left;
+  text-align: start;
   cursor: pointer;
 }
 .thing:hover {
@@ -1260,9 +1283,10 @@ button {
   z-index: 4;
   max-width: calc(100% - 300px);
   margin: 0;
-  padding: 7px 12px 7px 10px;
+  padding-block: 7px;
+  padding-inline: 10px 12px;
   border: 1px solid var(--line);
-  border-left: 3px solid var(--warn);
+  border-inline-start: 3px solid var(--warn);
   border-radius: var(--r);
   background: var(--surface);
   box-shadow: var(--shadow);
@@ -1294,7 +1318,7 @@ button {
 }
 .trail li + li::before {
   content: '›';
-  margin-right: 4px;
+  margin-inline-end: 4px;
   color: var(--line-2);
 }
 .trail [aria-current] {
@@ -1334,7 +1358,7 @@ button {
 .building {
   position: absolute;
   top: 12px;
-  left: 12px;
+  inset-inline-start: 12px;
   z-index: 3;
   display: grid;
   gap: 8px;
@@ -1417,7 +1441,7 @@ button {
   content: '';
   position: absolute;
   top: -2px;
-  right: -2px;
+  inset-inline-end: -2px;
   width: 5px;
   height: 5px;
   border-radius: 50%;
@@ -1505,7 +1529,7 @@ button {
   }
   .panel {
     height: auto;
-    border-left: 0;
+    border-inline-start: 0;
     overflow: visible;
   }
   .timeline {
@@ -1540,7 +1564,7 @@ button {
   }
   .badge {
     order: 2;
-    margin-left: auto;
+    margin-inline-start: auto;
   }
   .brand__where {
     font-size: 12px;
@@ -1555,7 +1579,7 @@ button {
     padding: 0 9px;
   }
   .dock {
-    left: 10px;
+    inset-inline-start: 10px;
     bottom: 10px;
     max-width: calc(100% - 20px);
   }
@@ -1589,4 +1613,30 @@ button {
   .feed-dot[data-state='live']::after {
     animation: none;
   }
+}
+
+/* ---------- Right to left ---------- */
+
+/*
+  Arabic mirrors the layout: the panel, the overlays, alignment and the back
+  arrow. Time and scales keep running left to right, as in a media player
+  and on a chart: the timeline, the charts and the colour ramps carry
+  dir="ltr" or are set here. The building map stays a map.
+*/
+[dir='rtl'] .back__arrow {
+  scale: -1 1;
+}
+/* Inside those left-to-right strips, a label still reads in its own language: "5 د/ث" as Arabic. */
+.timeline .seg__btn span,
+.timeline .feed,
+.ramp__labels span {
+  unicode-bidi: plaintext;
+}
+.chart svg {
+  direction: ltr;
+}
+/* Letter spacing breaks the joins of Arabic script. */
+:lang(ar) .h2,
+:lang(ar) .title {
+  letter-spacing: 0;
 }

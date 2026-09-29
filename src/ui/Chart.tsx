@@ -1,4 +1,5 @@
 import { useId } from 'react'
+import { say } from '../i18n'
 import { DAY_MIN, STEP } from '../sim/time'
 
 interface Props {
@@ -27,8 +28,12 @@ export function DayChart({ series, t, min, max, threshold, label, format }: Prop
     <figure className="chart">
       <svg viewBox={`0 0 ${W} ${H + 16}`} role="img" aria-labelledby={id} preserveAspectRatio="none">
         <title id={id}>
-          {label} over the day: now {format(series[Math.min(series.length - 1, Math.round(t / STEP))])}, peak {format(peak)}
-          {threshold !== undefined ? `, limit ${format(threshold)}` : ''}
+          {say(threshold === undefined ? '{label} over the day: now {now}, peak {peak}' : '{label} over the day: now {now}, peak {peak}, limit {limit}', {
+            label,
+            now: format(series[Math.min(series.length - 1, Math.round(t / STEP))]),
+            peak: format(peak),
+            limit: threshold === undefined ? '' : format(threshold),
+          })}
         </title>
         {[0, 6, 12, 18, 24].map((h) => (
           <line key={h} x1={x(h * 60)} x2={x(h * 60)} y1={0} y2={H} className="chart__grid" />

@@ -3,12 +3,9 @@ import { ROOMS, ROOM_BY_ID, STORY, WING_BY_CODE, wingOfAsset } from '../data/flo
 
 const ROOM_COUNT = ROOMS.length
 import type { Day, Layer, Selection, View } from '../data/types'
-import { applyEvents, emptyDay } from '../live/events'
 import type { FeedStatus } from '../live/feed'
 import type { Route } from '../lib/wayfinding'
-import type { Stamped } from '../live/protocol'
 import { isWing, scopeFromParam, scopeToParam, type Scope } from './scope'
-import { SEED } from '../sim/simulate'
 
 export const DEFAULT_TIME = 14 * 60 + 30
 export const SPEEDS = [5, 15, 60] as const
@@ -41,7 +38,8 @@ interface WardState {
   setDay: (day: Day, ms: number, complete: boolean) => void
   setMode: (mode: Mode) => void
   setFeed: (feed: FeedStatus) => void
-  applyFeed: (events: Stamped[], reset: boolean, at: number) => void
+  /** Takes the day the feed has built so far to its next state, as of minute `at`. */
+  applyFeed: (fold: (day: Day | null) => Day, at: number) => void
   resetView: () => void
   setT: (t: number) => void
   setPlaying: (p: boolean) => void
@@ -98,9 +96,9 @@ export const useWard = create<WardState>((set) => ({
     }),
   setFeed: (feed) => set({ feed }),
   // The feed closes after the switch back to replay has rendered, so a last frame of it can still arrive; it is dropped.
-  applyFeed: (events, reset, at) =>
+  applyFeed: (fold, at) =>
     // A live day holds every wing from its first sync.
-    set((s) => (s.mode === 'live' ? { day: applyEvents(reset || !s.day ? emptyDay(SEED) : s.day, events), complete: true, t: Math.min(1439, at) } : {})),
+    set((s) => (s.mode === 'live' ? { day: fold(s.day), complete: true, t: Math.min(1439, at) } : {})),
   resetView: () => set((s) => ({ selection: null, resetKey: s.resetKey + 1 })),
   setT: (t) => set({ t: Math.max(0, Math.min(1439, t)) }),
   setPlaying: (playing) => set({ playing }),
