@@ -61,7 +61,8 @@ What shows platform thinking.
 - The same rendering budget: frame rate and draw calls published at that scale.
 
 ### 2.3 Wayfinding
-- "Nearest free infusion pump": A* over the corridor graph, an animated route on the floor, and a walking-time estimate.
+- "Nearest free infusion pump": a shortest-path search over the corridor graph, an animated route on the floor, and a walking-time estimate.
+- Built with Dijkstra rather than A*: the question has many candidate pumps, and one search from the room reaches them all.
 
 ### 2.4 Sensor heatmaps in a shader
 - Temperature and CO₂ fields interpolated across the floor from sensor points in GLSL, in place of one flat colour per room.
@@ -89,7 +90,7 @@ A `<ward-twin>` web component and a postMessage API, so a host dashboard can sel
 - [ ] 1.3 Resilience on real hardware: adaptive quality and context-loss recovery are done and tested; the real-phone test still needs a device
 - [x] 1.4 A film: 34 seconds, captured on a controlled clock, with a loop in the README; the case study opens on it.
 - [x] 2.1 Live mode: a mock server streams the day over the feed protocol; resume by sequence number, backoff with jitter, a silence watchdog and one render per frame; `?mode=live`; the protocol in docs/live-feed.md
-- [ ] 2.2 A whole hospital
-- [ ] 2.3 Wayfinding
+- [x] 2.2 A whole hospital: six levels of six wings, 1,368 rooms, 1,008 beds and 3,006 tracked assets; an exploded view, a view of each level with its wings joined by glazed links, a building map and a trail back up; the whole hospital in 33 draw calls at 72 to 90 fps on an integrated GPU
+- [x] 2.3 Wayfinding: the nearest free pump, wheelchair, scanner or ventilator from any bed, by walking time across wings, rows and lifts, drawn on the floors
 - [ ] 2.4 Sensor heatmaps in a shader
 - [ ] Phase 3
