@@ -2,7 +2,7 @@ import { useLayoutEffect, useRef } from 'react'
 import { LEVELS, PLATE, ROOM_BY_ID, WING, center } from '../data/floorplan'
 import type { Day, Layer } from '../data/types'
 import { BED } from '../lib/colors'
-import { ASSET_LABEL, ASSET_STATUS_LABEL, BED_LABEL, activeCall, assetAt, bedAt, sample } from '../lib/query'
+import { ASSET_LABEL, ASSET_STATUS_LABEL, BED_LABEL, activeCall, assetAt, bedAt, sample, walking } from '../lib/query'
 import { assetPositions } from '../lib/positions'
 import { RIM, levelY } from '../scene/layout'
 import { HOSPITAL, levelScope, scopeLevel, scopeWings } from '../state/scope'
@@ -18,7 +18,9 @@ export function Tags() {
   const layer = useWard((s) => s.layer)
   const view = useWard((s) => s.view)
   const scope = useWard((s) => s.scope)
+  const route = useWard((s) => s.route)
   if (!day || view === 'list') return null
+  const end = route?.points.at(-1)
   const plan = view === 'plan'
   const selRoom = selection?.type === 'room' ? selection.id : undefined
   const selAsset = selection?.type === 'asset' ? day.assets.find((a) => a.id === selection.id) : undefined
@@ -43,6 +45,12 @@ export function Tags() {
         ))}
       {selRoom && <RoomTag key="sel" slot="sel" id={selRoom} day={day} t={t} layer={layer} plan={plan} strong />}
       {hover && hover !== selRoom && <RoomTag key="hover" slot="hover" id={hover} day={day} t={t} layer={layer} plan={plan} />}
+      {route && end && (
+        <Tag slot="route" x={end.x} y={levelY(end.level) + (plan ? 0.5 : 2.4)} z={end.z} strong>
+          <span className="tag__id">{route.asset}</span>
+          <span className="tag__meta">{walking(route.seconds)}</span>
+        </Tag>
+      )}
       {selAsset && assetPos && (
         <Tag slot="asset" x={assetPos.x} y={levelY(ROOM_BY_ID[assetAt(selAsset, t).loc].level) + (plan ? 0.5 : 2.4)} z={assetPos.z} strong>
           <span className="tag__id">{selAsset.id}</span>

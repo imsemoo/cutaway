@@ -157,3 +157,14 @@ test('a level shows its six wings, and the trail leads back up', async ({ page }
   await trail.getByRole('button', { name: 'Hospital' }).click()
   await expect(page).toHaveURL(/at=hospital/)
 })
+
+test('finds the nearest free pump for a room and draws the way to it', async ({ page }) => {
+  await page.goto('/?select=4A09')
+  await expect(page.locator('.title')).toContainText('4A09')
+  await page.getByRole('button', { name: 'Infusion pump', exact: true }).click()
+  const found = page.locator('.route')
+  await expect(found).toContainText(/IVP-\d{2} in the equipment store: \d+ m, \d+ s away/)
+  await expect(page.locator('.tag--strong', { hasText: /IVP-/ })).toBeVisible()
+  await page.getByRole('button', { name: 'Clear the way' }).click()
+  await expect(found).toHaveCount(0)
+})

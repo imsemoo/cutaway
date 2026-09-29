@@ -1,6 +1,7 @@
 import { ArrowLeft, BatteryLow, BellRing, Building2, Info, OctagonAlert, Play, TriangleAlert, Unplug } from 'lucide-react'
+import { useState } from 'react'
 import { BED_ROOMS, LEVELS, ROOMS, ROOM_BY_ID, STORY, WINGS, WING_BY_CODE, wingName, type Wing } from '../data/floorplan'
-import type { Alert, Asset, AssetKind, BedState, Day, Severity } from '../data/types'
+import type { Alert, Asset, AssetKind, BedState, Day, Room, Severity } from '../data/types'
 import { describe, severityAt } from '../lib/alerts'
 import { ASSET_STATUS, BED, SEVERITY } from '../lib/colors'
 import {
@@ -19,6 +20,7 @@ import {
   duration,
   roomName,
   sample,
+  walking,
 } from '../lib/query'
 import { outage } from '../live/mock'
 import { HOSPITAL, levelScope, scopeLevel, scopeWings } from '../state/scope'
@@ -639,9 +641,61 @@ function RoomDetail({ day, id }: { day: Day; id: string }) {
           </ul>
         )}
       </section>
+
+      {isBed && <Nearest room={room} />}
     </>
   )
 }
+
+/** What a nurse at this bedside most often goes to fetch; a ventilator only from an ICU bay. */
+const FETCH: AssetKind[] = ['pump', 'chair', 'scanner']
+
+/** The nearest free piece of equipment of a kind, with the way there drawn on the floors. */
+function Nearest({ room }: { room: Room }) {
+  const route = useWard((s) => (s.route?.from === room.id ? s.route : null))
+  const showRoute = useWard((s) => s.showRoute)
+  const [none, setNone] = useState<string | null>(null)
+  const kinds: AssetKind[] = room.kind === 'icu' ? [...FETCH, 'vent'] : FETCH
+
+  const find = async (kind: AssetKind) => {
+    // The walking graph and its search load only when someone asks for a way.
+    const { nearestFree, routeReach } = await import('../lib/wayfinding')
+    const { day, t } = useWard.getState()
+    const found = day ? nearestFree(day, t, room, kind) : undefined
+    setNone(found ? null : `No ${ASSET_LABEL[kind].toLowerCase()} is free anywhere in the hospital at ${clock(t)}.`)
+    if (!found) return showRoute(null)
+    // Wide enough to hold the whole way: this wing, its level, or the whole hospital when a lift is involved.
+    const reach = routeReach(found)
+    showRoute(found, reach === 'wing' ? room.wing : reach === 'level' ? levelScope(room.level) : HOSPITAL)
+  }
+
+  const at = route ? ROOM_BY_ID[route.at] : undefined
+  return (
+    <section className="section">
+      <h2 className="h2">Nearest free</h2>
+      <div className="fetch">
+        {kinds.map((k) => (
+          <button key={k} className="btn btn--quiet btn--small" aria-pressed={route ? route.asset.startsWith(PREFIX[k]) : false} onClick={() => void find(k)}>
+            {ASSET_LABEL[k]}
+          </button>
+        ))}
+      </div>
+      {route && at && (
+        <p className="small route" role="status">
+          <strong className="num">{route.asset}</strong> in the {at.name.toLowerCase()}
+          {at.wing !== room.wing ? `, ${wingName(WING_BY_CODE[at.wing])}` : ''}: {Math.round(route.metres)} m, {walking(route.seconds)}.{' '}
+          <button className="link" onClick={() => showRoute(null)}>
+            Clear the way
+          </button>
+        </p>
+      )}
+      {none && !route && <p className="small">{none}</p>}
+    </section>
+  )
+}
+
+/** The tag every kind's ids start with. */
+const PREFIX: Record<AssetKind, string> = { pump: 'IVP', vent: 'VEN', chair: 'WCH', xray: 'PXR', scanner: 'BSC' }
 
 /* ---------- Asset ---------- */
 

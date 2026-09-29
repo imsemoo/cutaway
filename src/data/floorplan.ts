@@ -124,6 +124,41 @@ export function wingOfAsset(id: string) {
   return m ? m[1] : /^[A-Z]{3}-\d{2}$/.test(id) ? STORY : undefined
 }
 
+/* ---------- Circulation: where people walk ---------- */
+
+/** A wing's two corridors, by the z of their north edge in the wing's own coordinates. */
+export const CORRIDORS = [7.5, 15.5]
+export const CORRIDOR_W = 3
+/** The gap in the core, between the stair and the ICU station, where the two corridors meet. */
+export const CROSSING_X = 55
+
+/**
+  The glazed links of every level. Between neighbouring wings in a row, one
+  runs along each corridor; in each street between columns, one runs from
+  the north row's corridor B to the south row's corridor A, so the two rows
+  meet without the lifts. `x` and `z` are the link's north-west corner.
+*/
+export interface Link {
+  level: number
+  x: number
+  z: number
+  length: number
+  axis: 'x' | 'z'
+}
+
+export const LINKS: Link[] = WINGS.flatMap((w) => {
+  const next = WINGS.filter((o) => o.level === w.level && o.z === w.z && o.x > w.x).sort((a, b) => a.x - b.x)[0]
+  if (!next) return []
+  const gap = next.x - (w.x + WING.w)
+  const along = CORRIDORS.map((dz): Link => ({ level: w.level, x: w.x + WING.w, z: w.z + dz, length: gap, axis: 'x' }))
+  if (w.z !== 0) return along
+  // A north-row wing also starts the street link down to the south row.
+  const south = WINGS.find((o) => o.level === w.level && o.x === w.x && o.z > w.z)!
+  const top = w.z + CORRIDORS[1] + CORRIDOR_W
+  const across: Link = { level: w.level, x: w.x + WING.w + (gap - CORRIDOR_W) / 2, z: top, length: south.z + CORRIDORS[0] - top, axis: 'z' }
+  return [...along, across]
+})
+
 /** "Level 4, A wing": how a person names a wing. */
 export const wingName = (w: Wing) => `Level ${w.level}, ${w.code.slice(1)} wing`
 

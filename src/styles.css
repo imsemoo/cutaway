@@ -1301,6 +1301,26 @@ button {
   margin-top: 14px;
 }
 
+/* The nearest free equipment: a row of kinds to fetch, and the way to one. */
+.fetch {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+.btn--small {
+  height: 30px;
+  padding: 0 10px;
+  font-size: 13px;
+}
+.btn--quiet[aria-pressed='true'] {
+  background: var(--accent-soft);
+  color: var(--accent-2);
+  box-shadow: inset 0 0 0 1px var(--accent);
+}
+.route {
+  margin: 10px 0 0;
+}
+
 /* ---------- The building ---------- */
 
 /*

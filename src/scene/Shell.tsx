@@ -2,7 +2,7 @@ import { useFrame, useThree } from '@react-three/fiber'
 import { useEffect, useLayoutEffect, useMemo, useRef } from 'react'
 import { BoxGeometry, Color, MathUtils, Matrix4, PlaneGeometry, type InstancedMesh, type MeshStandardMaterial } from 'three'
 import { mergeGeometries } from 'three/examples/jsm/utils/BufferGeometryUtils.js'
-import { LEVELS, PLATE, STOREY, WING, WINGS } from '../data/floorplan'
+import { CORRIDOR_W, LEVELS, LINKS, PLATE, STOREY, WING, WINGS } from '../data/floorplan'
 import { HOSPITAL, scopeLevel, shows, type Scope } from '../state/scope'
 import { useWard } from '../state/store'
 import { WALL_T, buildShell } from './geometry'
@@ -19,16 +19,8 @@ const TONES = {
   fixtures: [new Color('#c9d0d8'), new Color('#9aa5b1')],
 } as const
 
-/** Glazed links between neighbouring wings in a row, one for each of the two corridors, on every level. */
-const LINKS = WINGS.flatMap((w) => {
-  const next = WINGS.filter((o) => o.level === w.level && o.z === w.z && o.x > w.x).sort((a, b) => a.x - b.x)[0]
-  if (!next) return []
-  const length = next.x - (w.x + WING.w)
-  return [7.5, 15.5].map((dz) => ({ level: w.level, x: w.x + WING.w, z: w.z + dz, length }))
-})
-const CORRIDOR = 3
-
 const m = new Matrix4()
+const turn = new Matrix4().makeRotationY(-Math.PI / 2)
 /**
   The wings in scope packed into the first instances, each at its place on
   its level with the walls at their current height. The mesh draws only
@@ -54,8 +46,10 @@ function placeLinks(mesh: InstancedMesh | null, height: number, scope: Scope) {
   let n = 0
   for (const l of LINKS) {
     if (scope !== HOSPITAL && scopeLevel(scope) !== l.level) continue
+    // A link is modelled along x; one along z is turned, which swings its width to the west, so it starts a width further east.
     m.makeScale(l.length, height, 1)
-    m.setPosition(l.x, levelY(l.level), l.z)
+    if (l.axis === 'z') m.premultiply(turn)
+    m.setPosition(l.axis === 'z' ? l.x + CORRIDOR_W : l.x, levelY(l.level), l.z)
     mesh.setMatrixAt(n++, m)
   }
   mesh.count = n
@@ -84,10 +78,10 @@ export function Shell() {
   // One metre of link, stretched to each gap: a floor, and glass on both sides.
   const link = useMemo(
     () => ({
-      floor: new BoxGeometry(1, 0.07, CORRIDOR).translate(0.5, 0.035, CORRIDOR / 2),
+      floor: new BoxGeometry(1, 0.07, CORRIDOR_W).translate(0.5, 0.035, CORRIDOR_W / 2),
       glass: mergeGeometries([
         new BoxGeometry(1, STOREY.wallHeight, WALL_T).translate(0.5, STOREY.wallHeight / 2, WALL_T / 2),
-        new BoxGeometry(1, STOREY.wallHeight, WALL_T).translate(0.5, STOREY.wallHeight / 2, CORRIDOR - WALL_T / 2),
+        new BoxGeometry(1, STOREY.wallHeight, WALL_T).translate(0.5, STOREY.wallHeight / 2, CORRIDOR_W - WALL_T / 2),
       ]),
     }),
     [],

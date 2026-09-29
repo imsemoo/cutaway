@@ -12,6 +12,7 @@ import { Equipment } from './Equipment'
 import { Floors } from './Floors'
 import { FrameMeter } from './FrameMeter'
 import { Overlays } from './Overlays'
+import { Route } from './Route'
 import { AdaptiveQuality, ContextWatch } from './Resilience'
 import { Shell } from './Shell'
 import { TagTracker } from './TagTracker'
@@ -129,6 +130,7 @@ export default function Scene() {
       <Beds />
       <Equipment />
       <Overlays />
+      <Route />
       <TagTracker />
       <CameraRig />
       {level >= 2 && (

@@ -14,6 +14,9 @@ export const duration = (min: number) => {
   return m % 60 ? `${h} h ${m % 60} min` : `${h} h`
 }
 
+/** A walk as a person would say it: "40 s away", "3 min away". */
+export const walking = (seconds: number) => (seconds < 60 ? `${Math.max(5, Math.round(seconds / 5) * 5)} s away` : `${Math.round(seconds / 60)} min away`)
+
 export function spanAt<T extends { from: number; to: number }>(list: T[] | undefined, m: number): T | undefined {
   if (!list) return undefined
   for (const s of list) if (m >= s.from && m < s.to) return s

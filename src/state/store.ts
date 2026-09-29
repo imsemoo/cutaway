@@ -5,6 +5,7 @@ const ROOM_COUNT = ROOMS.length
 import type { Day, Layer, Selection, View } from '../data/types'
 import { applyEvents, emptyDay } from '../live/events'
 import type { FeedStatus } from '../live/feed'
+import type { Route } from '../lib/wayfinding'
 import type { Stamped } from '../live/protocol'
 import { isWing, scopeFromParam, scopeToParam, type Scope } from './scope'
 import { SEED } from '../sim/simulate'
@@ -33,6 +34,8 @@ interface WardState {
   layer: Layer
   scope: Scope
   selection: Selection | null
+  /** The way to the nearest free piece of equipment, while it is on show. */
+  route: Route | null
   hover: string | null
   resetKey: number
   setDay: (day: Day, ms: number, complete: boolean) => void
@@ -47,6 +50,8 @@ interface WardState {
   setLayer: (l: Layer) => void
   setScope: (scope: Scope) => void
   select: (s: Selection | null) => void
+  /** Shows a route, widening the view to hold it without losing the room it starts from. */
+  showRoute: (route: Route | null, scope?: Scope) => void
   setHover: (id: string | null) => void
 }
 
@@ -80,6 +85,7 @@ export const useWard = create<WardState>((set) => ({
   playing: false,
   speed: 15,
   ...fromUrl(),
+  route: null,
   hover: null,
   resetKey: 0,
   setDay: (day, simMs, complete) => set((s) => ({ recorded: day, simMs, ...(s.mode === 'replay' && { day, complete }) })),
@@ -102,9 +108,10 @@ export const useWard = create<WardState>((set) => ({
   setView: (view) => set({ view }),
   setLayer: (layer) => set({ layer }),
   // Leaving a wing leaves its selection behind.
-  setScope: (scope) => set((s) => (scope === s.scope ? {} : { scope, selection: null, hover: null })),
+  setScope: (scope) => set((s) => (scope === s.scope ? {} : { scope, selection: null, route: null, hover: null })),
   // Picking something anywhere goes to its wing.
-  select: (selection) => set(selection ? { selection, scope: selectionWing(selection) } : { selection }),
+  select: (selection) => set(selection ? { selection, scope: selectionWing(selection), route: null } : { selection, route: null }),
+  showRoute: (route, scope) => set((s) => ({ route, scope: scope ?? s.scope })),
   setHover: (hover) => set({ hover }),
 }))
 

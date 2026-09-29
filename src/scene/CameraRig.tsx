@@ -79,6 +79,7 @@ export function CameraRig() {
   const view = useWard((s) => s.view)
   const scope = useWard((s) => s.scope)
   const selection = useWard((s) => s.selection)
+  const route = useWard((s) => s.route)
   const resetKey = useWard((s) => s.resetKey)
   const size = useThree((s) => s.size)
   const fov = useThree((s) => ('fov' in s.camera ? (s.camera as PerspectiveCamera).fov : 35))
@@ -125,6 +126,23 @@ export function CameraRig() {
     const at = asset && state.day ? assetPositions(state.day, state.t).get(asset.id) : undefined
     if (asset && at) focus = { ...at, y: levelY(ROOM_BY_ID[assetAt(asset, state.t).loc].level) }
 
+    // A route is framed whole, from the room to the equipment, on every level it crosses.
+    if (route) {
+      const xs = route.points.map((p) => p.x)
+      const zs = route.points.map((p) => p.z)
+      const ys = route.points.map((p) => levelY(p.level))
+      const pad = 6
+      const box = { x: Math.min(...xs) - pad, y: Math.min(...ys), z: Math.min(...zs) - pad, w: Math.max(...xs) - Math.min(...xs) + pad * 2, h: Math.max(...ys) - Math.min(...ys) + STOREY.wallHeight, d: Math.max(...zs) - Math.min(...zs) + pad * 2 }
+      const mid = new Vector3(box.x + box.w / 2, box.y + box.h / 2, box.z + box.d / 2)
+      const polar = above ? 0 : DEG(whole ? 60 : 50)
+      const fit = fitBox(cornersOf(box), mid, azimuth, polar, fov, aspect, area)
+      void c.rotateTo(azimuth, polar, animate)
+      void c.moveTo(mid.x, mid.y, mid.z, animate)
+      void c.dollyTo(Math.max(fit.dist, 18), animate)
+      void c.setFocalOffset(fit.offset.x, fit.offset.y, 0, animate)
+      return
+    }
+
     if (focus) {
       const polar = above ? 0 : DEG(42)
       const dist = (above ? 30 : 24) * (portrait ? 1.35 : 1)
@@ -146,7 +164,7 @@ export function CameraRig() {
     void c.moveTo(mid.x, mid.y, mid.z, animate)
     void c.dollyTo(fit.dist, animate)
     void c.setFocalOffset(fit.offset.x, fit.offset.y, 0, animate)
-  }, [c, plan, scope, selection?.type, selection?.id, resetKey, aspectStep, portrait])
+  }, [c, plan, scope, selection?.type, selection?.id, route, resetKey, aspectStep, portrait])
 
   return <CameraControls ref={setControls} makeDefault />
 }
