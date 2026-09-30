@@ -98,4 +98,5 @@ A `<ward-twin>` web component and a postMessage API, so a host dashboard can sel
 - [x] 2.4 Sensor heatmaps in a shader: corridors estimated in the fragment shader from the rooms' doors, with isolines and the alert limit; rooms keep their own readings
 - [x] 3.1 Arabic, right to left: the whole interface, the alerts and the floor labels, mirrored where Arabic reads that way; the first load stays at 90 kB
 - [x] 3.2 Architecture notes: an architecture page, nine decision records, and a making-of with the numbers before and after each change
-- [ ] 3.3 and 3.4
+- [x] 3.3 Embed API: `<ward-twin>` in a 1 kB `embed.js`, a postMessage protocol in the link's own words, origin-locked after a handshake; a demo host page at /host/; docs/embed.md and decision 10
+- [ ] 3.4

@@ -11,3 +11,4 @@ Short records of the choices that shaped Ward Twin: what forced each one, what w
 7. [Rooms keep their sensor; only the corridors are estimated](0007-corridors-not-walls.md)
 8. [English is the key for the Arabic interface](0008-english-is-the-key.md)
 9. [A budget for every chunk, and for the first load](0009-budgets.md)
+10. [Embed through an iframe, with the link's own words](0010-embed-through-an-iframe.md)

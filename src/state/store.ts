@@ -55,22 +55,61 @@ interface WardState {
 
 const VIEWS: View[] = ['3d', 'plan', 'list']
 const LAYERS: Layer[] = ['beds', 'temp', 'air', 'calls']
+const MODES: Mode[] = ['replay', 'live']
 const ASSET_ID = /^(IVP|VEN|WCH|PXR|BSC)-(\d[A-Z]-)?\d{2}$/
 
 /** The wing a selection lives in. */
 export const selectionWing = (s: Selection) => (s.type === 'room' ? ROOM_BY_ID[s.id]?.wing : wingOfAsset(s.id)) ?? STORY
 
+export interface Params {
+  view?: View
+  layer?: Layer
+  t?: number
+  selection?: Selection | null
+  scope?: Scope
+  mode?: Mode
+}
+
+/**
+  Reads a view's parameters, from a link or from a page that embeds the twin: the values
+  that are valid, and the names of those given that are not. A key left out is undefined;
+  an empty or null `select` clears the selection.
+*/
+export function readParams(given: Record<string, unknown>): { params: Params; bad: string[] } {
+  const params: Params = {}
+  const bad: string[] = []
+  const check = <K extends keyof Params>(key: string, into: K, value: Params[K] | undefined) => {
+    if (given[key] === undefined) return
+    if (value === undefined) bad.push(key)
+    else params[into] = value
+  }
+  const text = (key: string) => (typeof given[key] === 'string' ? (given[key] as string) : undefined)
+  const hhmm = /^(\d{1,2}):(\d{2})$/.exec(text('t') ?? '')
+  const at = text('at')
+  const id = text('select')?.toUpperCase()
+  check('view', 'view', VIEWS.find((v) => v === given.view))
+  check('layer', 'layer', LAYERS.find((l) => l === given.layer))
+  check('t', 't', hhmm ? Math.min(1439, Number(hhmm[1]) * 60 + Number(hhmm[2])) : undefined)
+  check('mode', 'mode', MODES.find((m) => m === given.mode))
+  check('at', 'scope', at === undefined ? undefined : scopeFromParam(at))
+  check('select', 'selection',
+    given.select === null || id === '' ? null
+    : id && ROOM_BY_ID[id] ? { type: 'room', id }
+    : id && ASSET_ID.test(id) ? { type: 'asset', id }
+    : undefined)
+  return { params, bad }
+}
+
 /** A shared link opens the same view: ?view=plan&layer=air&t=18:00&select=FAM, ?at=level-4, or ?mode=live */
 function fromUrl() {
   const q = new URLSearchParams(typeof location === 'undefined' ? '' : location.search)
-  const view = VIEWS.find((v) => v === q.get('view')) ?? '3d'
-  const layer = LAYERS.find((l) => l === q.get('layer')) ?? 'beds'
-  const hhmm = /^(\d{1,2}):(\d{2})$/.exec(q.get('t') ?? '')
-  const t = hhmm ? Math.min(1439, Number(hhmm[1]) * 60 + Number(hhmm[2])) : DEFAULT_TIME
-  const id = (q.get('select') ?? '').toUpperCase()
-  const selection: Selection | null = ROOM_BY_ID[id] ? { type: 'room', id } : ASSET_ID.test(id) ? { type: 'asset', id } : null
-  const scope: Scope = selection ? selectionWing(selection) : (scopeFromParam(q.get('at') ?? '') ?? STORY)
-  const mode: Mode = q.get('mode') === 'live' ? 'live' : 'replay'
+  const { params: p } = readParams(Object.fromEntries(q))
+  const view = p.view ?? '3d'
+  const layer = p.layer ?? 'beds'
+  const t = p.t ?? DEFAULT_TIME
+  const selection = p.selection ?? null
+  const scope: Scope = selection ? selectionWing(selection) : (p.scope ?? STORY)
+  const mode: Mode = p.mode ?? 'replay'
   const feed: FeedStatus = mode === 'live' ? { state: 'connecting', attempt: 0 } : { state: 'closed' }
   return { view, layer, t, replayT: t, scope, selection, mode, feed }
 }

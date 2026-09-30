@@ -45,6 +45,14 @@ Loading the catalogue before the first paint was written first as a top-level `a
 
 The Arabic face was chosen by setting the interface's own text in six faces beside Schibsted Grotesk and comparing them: Vazirmatn matched its size and calm and kept the panel's line spacing.
 
+## An embed, and the kilobyte it cost
+
+A dashboard can now put the twin inside itself with one tag, `<ward-twin>`, which frames the twin and talks to it in messages ([decision 10](decisions/0010-embed-through-an-iframe.md)). The twin's side of that conversation loads only when the page runs in a frame, so it should have cost an ordinary visit nothing. The budget said otherwise: the first load went from 89.7 to 90.6 kB, over its 90 kB limit. The bridge shares the language and query modules with the entry, and once it imported them too, the bundler moved them into a small chunk of their own, which the entry loads at once. Of the 0.9 kB, 0.2 kB was code; the rest was the cost of a separate file.
+
+Five ways around it were measured: two bundler settings, a hand-made React chunk, loading the bridge from the entry file, and handing the bridge its helpers from the app so it imported nothing shared. None got under 90.2 kB. The budget went to 91 kB, with the reason in the script, which is the rule the budget set for itself.
+
+The unit tests found one real fault in the bridge. A host that set a room and a time in one command heard about the room at once and the time a second later: each change was reported on its own, and the clock is throttled to once a second so that a playing day does not flood the host. A host's command is now applied whole and reported once.
+
 ## Not measured yet
 
 Every number here comes from one laptop and emulated phones. A low-end Android phone and an iPhone are the tests the project still needs.

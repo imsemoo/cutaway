@@ -1,0 +1,255 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Ward Twin inside a host page</title>
+  <meta name="description" content="A mock operations page that embeds Ward Twin with the ward-twin element: it moves the twin and hears its alerts. A concept with simulated data.">
+  <link rel="icon" href="../favicon.svg">
+  <!-- The whole integration: this script, then the element where the twin goes. -->
+  <script src="../embed.js" defer></script>
+  <style>
+    :root {
+      color-scheme: light;
+      --ink: #121926;
+      --ink-2: #1b2433;
+      --ink-line: #2c3748;
+      --on-ink: #eef2f7;
+      --on-ink-2: #a9b4c4;
+      --accent: #7f9cff;
+      --crit: #ff8a80;
+      --warn: #f5b454;
+      --font: system-ui, -apple-system, 'Segoe UI', sans-serif;
+      --mono: ui-monospace, 'SF Mono', Consolas, monospace;
+    }
+    * { box-sizing: border-box; }
+    body { margin: 0; background: var(--ink); color: var(--on-ink); font: 14px/1.45 var(--font); }
+    a { color: var(--accent); }
+    button, input { font: inherit; color: inherit; }
+    :focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+
+    .bar { display: flex; flex-wrap: wrap; gap: 4px 16px; align-items: baseline; justify-content: space-between; padding: 12px 16px; border-block-end: 1px solid var(--ink-line); }
+    .bar strong { font-size: 15px; letter-spacing: .01em; }
+    .bar p { margin: 0; color: var(--on-ink-2); font-size: 13px; }
+    code { font-family: var(--mono); font-size: .92em; }
+
+    .layout { display: grid; grid-template-columns: 1fr; }
+    ward-twin { height: 78svh; min-height: 480px; background: #e8ecf0; }
+    .side { min-width: 0; padding: 4px 16px 24px; }
+    @media (min-width: 960px) {
+      body { height: 100svh; display: grid; grid-template-rows: auto 1fr; }
+      .layout { grid-template-columns: 21rem 1fr; min-height: 0; }
+      ward-twin { order: 2; height: 100%; min-height: 0; }
+      .side { order: 1; overflow-y: auto; border-inline-end: 1px solid var(--ink-line); }
+    }
+
+    section { padding-block: 16px; border-block-end: 1px solid var(--ink-line); }
+    h2 { margin: 0 0 10px; font-size: 12px; font-weight: 600; letter-spacing: .06em; text-transform: uppercase; color: var(--on-ink-2); display: flex; gap: 8px; align-items: center; }
+    .count { font-family: var(--mono); color: var(--on-ink); letter-spacing: 0; }
+
+    .btn { border: 1px solid var(--ink-line); background: var(--ink-2); border-radius: 6px; padding: 6px 10px; cursor: pointer; min-height: 32px; }
+    .btn:hover { border-color: var(--on-ink-2); }
+    .btn[aria-pressed="true"], .seg input:checked + span { background: var(--on-ink); color: var(--ink); border-color: var(--on-ink); }
+    .row { display: flex; flex-wrap: wrap; gap: 6px; }
+
+    label, legend { display: block; margin-block: 12px 6px; color: var(--on-ink-2); font-size: 13px; padding: 0; }
+    legend { margin-block-start: 0; }
+    fieldset { border: 0; margin: 14px 0 0; padding: 0; min-width: 0; }
+    input[type="text"] { flex: 1; min-width: 0; background: var(--ink); border: 1px solid var(--ink-line); border-radius: 6px; padding: 6px 10px; font-family: var(--mono); text-transform: uppercase; }
+    input[type="text"]::placeholder { color: #6b778a; }
+    .seg { display: flex; flex-wrap: wrap; gap: 4px; }
+    .seg label { margin: 0; color: var(--on-ink); }
+    .seg input { position: absolute; opacity: 0; pointer-events: none; }
+    .seg span { display: block; border: 1px solid var(--ink-line); border-radius: 6px; padding: 5px 9px; cursor: pointer; }
+    .seg input:focus-visible + span { outline: 2px solid var(--accent); outline-offset: 2px; }
+    .error { margin: 6px 0 0; color: var(--crit); min-height: 1lh; font-size: 13px; }
+
+    dl { display: grid; grid-template-columns: auto 1fr; gap: 4px 12px; margin: 0 0 12px; }
+    dt { color: var(--on-ink-2); }
+    dd { margin: 0; font-family: var(--mono); overflow-wrap: anywhere; }
+
+    .latest { margin: 0 0 10px; padding: 8px 10px; border-inline-start: 3px solid var(--warn); background: var(--ink-2); font-size: 13px; }
+    .latest:empty { display: none; }
+    .alerts { list-style: none; margin: 0; padding: 0; display: grid; gap: 6px; }
+    .alert { display: grid; gap: 2px; width: 100%; text-align: start; padding: 8px 10px; border: 1px solid var(--ink-line); border-inline-start: 3px solid var(--warn); border-radius: 6px; background: var(--ink-2); cursor: pointer; }
+    .alert:hover { border-color: var(--on-ink-2); border-inline-start-color: var(--warn); }
+    .alert.is-critical, .alert.is-critical:hover { border-inline-start-color: var(--crit); }
+    .alert__head { display: flex; gap: 8px; justify-content: space-between; align-items: baseline; }
+    .alert__title { font-weight: 600; }
+    .alert__sev { font-size: 11px; letter-spacing: .06em; text-transform: uppercase; color: var(--warn); white-space: nowrap; }
+    .is-critical .alert__sev { color: var(--crit); }
+    .alert__where, .alert__text { color: var(--on-ink-2); font-size: 13px; }
+    .empty { color: var(--on-ink-2); margin: 0; }
+    .more { margin-block-start: 8px; font-size: 13px; }
+    .more:empty { display: none; }
+
+    details { padding-block: 16px; }
+    summary { cursor: pointer; color: var(--on-ink-2); font-size: 12px; font-weight: 600; letter-spacing: .06em; text-transform: uppercase; }
+    .log { list-style: none; margin: 10px 0 0; padding: 0; font: 12px/1.5 var(--mono); color: var(--on-ink-2); }
+    .log li { padding-block: 3px; border-block-end: 1px solid var(--ink-line); overflow-wrap: anywhere; }
+    .log b { color: var(--on-ink); font-weight: 400; }
+  </style>
+</head>
+<body>
+  <header class="bar">
+    <strong>Ward operations</strong>
+    <p>A mock host page. Ward Twin runs inside it through <code>&lt;ward-twin&gt;</code>; both are a concept with simulated data. <a href="https://github.com/imsemoo/ward-twin/blob/main/docs/embed.md">How the embed works</a></p>
+  </header>
+  <main class="layout">
+    <ward-twin id="twin" at="4a"></ward-twin>
+    <div class="side">
+      <section aria-labelledby="show-h">
+        <h2 id="show-h">Show in the twin</h2>
+        <div class="row">
+          <button class="btn" type="button" data-at="hospital">Whole hospital</button>
+          <button class="btn" type="button" data-at="level-4">Level 4</button>
+          <button class="btn" type="button" data-at="4a">Wing 4A</button>
+        </div>
+        <form id="find">
+          <label for="room">Room or equipment</label>
+          <div class="row">
+            <input id="room" type="text" placeholder="4A09" autocomplete="off" spellcheck="false" aria-describedby="find-error">
+            <button class="btn">Show</button>
+          </div>
+          <p id="find-error" class="error" role="status"></p>
+        </form>
+        <fieldset class="seg-wrap">
+          <legend>Layer</legend>
+          <div class="seg" id="layers">
+            <label><input type="radio" name="layer" value="beds" checked><span>Beds</span></label>
+            <label><input type="radio" name="layer" value="temp"><span>Temperature</span></label>
+            <label><input type="radio" name="layer" value="air"><span>Air</span></label>
+            <label><input type="radio" name="layer" value="calls"><span>Call lights</span></label>
+          </div>
+        </fieldset>
+        <fieldset>
+          <legend>The twin's language</legend>
+          <div class="seg" id="langs">
+            <label><input type="radio" name="lang" value="en" checked><span>English</span></label>
+            <label><input type="radio" name="lang" value="ar"><span lang="ar">العربية</span></label>
+          </div>
+        </fieldset>
+      </section>
+
+      <section aria-labelledby="now-h">
+        <h2 id="now-h">In the twin now</h2>
+        <dl>
+          <dt>Showing</dt><dd id="now-at">…</dd>
+          <dt>Selected</dt><dd id="now-select">…</dd>
+          <dt>Time</dt><dd id="now-t">…</dd>
+        </dl>
+        <button class="btn" type="button" id="play" aria-pressed="false">Play the day</button>
+      </section>
+
+      <section aria-labelledby="alerts-h">
+        <h2 id="alerts-h">Open alerts <span class="count" id="count">0</span></h2>
+        <p class="latest" id="latest" aria-live="polite"></p>
+        <ul class="alerts" id="alerts"></ul>
+        <p class="empty" id="no-alerts">None at this minute.</p>
+        <p class="empty more" id="more"></p>
+      </section>
+
+      <details>
+        <summary>Messages</summary>
+        <ol class="log" id="log" reversed></ol>
+      </details>
+    </div>
+  </main>
+
+  <script>
+    // Everything below is what a host writes: set() to move the twin, events to hear it.
+    const twin = document.getElementById('twin')
+    const byId = (id) => document.getElementById(id)
+
+    const place = (at) => at === 'hospital' ? 'Whole hospital' : at.startsWith('level-') ? `Level ${at.slice(6)}` : `Wing ${at.toUpperCase()}`
+
+    function send(settings) {
+      log('→', { type: 'set', ...settings })
+      twin.set(settings)
+    }
+
+    for (const button of document.querySelectorAll('[data-at]')) {
+      button.addEventListener('click', () => send({ at: button.dataset.at }))
+    }
+    byId('find').addEventListener('submit', (e) => {
+      e.preventDefault()
+      const id = byId('room').value.trim()
+      byId('find-error').textContent = ''
+      if (id) send({ select: id })
+    })
+    byId('layers').addEventListener('change', (e) => send({ layer: e.target.value }))
+    byId('langs').addEventListener('change', (e) => send({ lang: e.target.value }))
+    byId('play').addEventListener('click', () => send({ playing: !twin.state?.playing }))
+
+    twin.addEventListener('twin-change', (e) => {
+      const { state } = e.detail
+      byId('now-at').textContent = place(state.at)
+      byId('now-select').textContent = state.select ?? 'Nothing'
+      byId('now-t').textContent = `${state.t}${state.mode === 'live' ? ', live' : state.playing ? ', playing' : ''}`
+      document.querySelector(`[name="layer"][value="${state.layer}"]`).checked = true
+      document.querySelector(`[name="lang"][value="${state.lang}"]`).checked = true
+      const play = byId('play')
+      play.disabled = state.mode === 'live'
+      play.setAttribute('aria-pressed', String(state.playing))
+      play.textContent = state.playing ? 'Pause' : 'Play the day'
+    })
+
+    twin.addEventListener('twin-select', (e) => {
+      if (e.detail.id) byId('room').value = e.detail.id
+    })
+
+    twin.addEventListener('twin-error', (e) => {
+      if (e.detail.key === 'select') byId('find-error').textContent = `Nothing in the hospital is called ${byId('room').value.trim()}.`
+    })
+
+    const SHOWN = 8
+    twin.addEventListener('twin-alerts', (e) => {
+      const order = { critical: 0, warning: 1, info: 2 }
+      const alerts = [...e.detail.alerts].sort((a, b) => order[a.severity] - order[b.severity] || a.since.localeCompare(b.since))
+      byId('count').textContent = alerts.length
+      byId('no-alerts').hidden = alerts.length > 0
+      byId('more').textContent = alerts.length > SHOWN ? `And ${alerts.length - SHOWN} more, less urgent or older.` : ''
+      byId('alerts').replaceChildren(...alerts.slice(0, SHOWN).map((alert) => {
+        const li = document.createElement('li')
+        const button = document.createElement('button')
+        button.type = 'button'
+        button.className = `alert${alert.severity === 'critical' ? ' is-critical' : ''}`
+        // The twin words its alerts in its own language; dir="auto" and <bdi> keep Arabic in order inside this English page.
+        button.innerHTML = '<span class="alert__head"><span class="alert__title" dir="auto"></span><span class="alert__sev"></span></span><span class="alert__where"><bdi></bdi>, wing </span><span class="alert__text" dir="auto"></span>'
+        button.querySelector('.alert__title').textContent = alert.title
+        button.querySelector('.alert__sev').textContent = alert.severity
+        button.querySelector('.alert__where bdi').textContent = alert.where
+        button.querySelector('.alert__where').append(alert.wing)
+        button.querySelector('.alert__text').textContent = alert.text
+        button.addEventListener('click', () => send({ select: alert.target.id }))
+        li.append(button)
+        return li
+      }))
+    })
+
+    twin.addEventListener('twin-alert', (e) => {
+      const { alert } = e.detail
+      const latest = byId('latest')
+      latest.textContent = `Opened at ${twin.state?.t ?? ''}: `
+      const what = document.createElement('bdi')
+      what.textContent = `${alert.title}, ${alert.where}`
+      latest.append(what)
+    })
+
+    // The raw messages from the twin, for anyone reading how it talks.
+    window.addEventListener('message', (e) => {
+      if (e.data?.protocol === 'ward-twin/1' && e.data.type !== 'alerts') log('←', e.data)
+    })
+    function log(arrow, message) {
+      const { protocol, type, ...rest } = message
+      const li = document.createElement('li')
+      li.innerHTML = '<b></b> '
+      li.querySelector('b').textContent = `${arrow} ${type}`
+      li.append(JSON.stringify(rest))
+      const list = byId('log')
+      list.prepend(li)
+      while (list.children.length > 40) list.lastElementChild.remove()
+    }
+  </script>
+</body>
+</html>

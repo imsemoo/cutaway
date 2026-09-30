@@ -216,3 +216,64 @@ test('an Arabic link opens in Arabic, with readings, times and room numbers inta
   await expect(page.getByRole('columnheader', { name: 'الغرفة' })).toBeVisible()
   await expect(page.locator('.rooms tbody tr')).toHaveCount(38)
 })
+
+// A host on another origin: Playwright serves this page at a made-up address, and the twin comes from the preview server.
+// Chrome asks before a page from elsewhere loads anything from this machine; the test grants that, as it can for a secure page.
+const HOST = 'https://host.test/'
+const hostPage = (twin: string) => `<!doctype html>
+<script src="${twin}embed.js" defer></script>
+<ward-twin at="4a" style="height: 640px"></ward-twin>
+<script>
+  window.heard = []
+  for (const type of ['twin-ready', 'twin-select', 'twin-alerts', 'twin-alert', 'twin-error'])
+    document.addEventListener(type, (e) => heard.push({ type, ...e.detail }))
+</script>`
+
+type Heard = { type: string; id?: string; key?: string; alerts?: { title: string; target: { id: string } }[]; alert?: { title: string } }
+
+test('a page on another origin moves the embedded twin and hears what happens in it', async ({ page, context, baseURL }) => {
+  await context.grantPermissions(['local-network-access'], { origin: HOST })
+  await page.route(HOST, (route) => route.fulfill({ contentType: 'text/html', body: hostPage(baseURL!) }))
+  await page.goto(HOST)
+  const heard = (type: string) => page.evaluate((t) => (window as unknown as { heard: Heard[] }).heard.filter((h) => h.type === t), type)
+  const twin = page.frameLocator('ward-twin iframe')
+  await expect(twin.getByRole('heading', { name: /Beds at\s+14:30/ })).toBeVisible()
+  await expect.poll(() => heard('twin-ready')).toHaveLength(1)
+
+  // The host sets what a link sets.
+  await page.evaluate(() => (document.querySelector('ward-twin') as HTMLElement & { set: (s: object) => void }).set({ select: '4A09', layer: 'temp' }))
+  await expect(twin.locator('.title')).toContainText('4A09')
+  await expect(twin.getByRole('radio', { name: 'Temperature' })).toHaveAttribute('aria-checked', 'true')
+
+  // A room picked inside the twin reaches the host.
+  await twin.locator('#search').fill('4B04')
+  await twin.locator('#search').press('Enter')
+  await expect(twin.locator('.title')).toContainText('4B04')
+  await expect.poll(async () => (await heard('twin-select')).map((h) => h.id)).toContain('4B04')
+
+  // The host hears the open alerts, and each one opening while the day plays.
+  const [listed] = (await heard('twin-alerts')).slice(-1)
+  expect(listed.alerts?.length).toBeGreaterThan(0)
+  expect(listed.alerts?.[0]).toMatchObject({ title: expect.any(String), target: { id: expect.any(String) } })
+  await page.evaluate(() => (document.querySelector('ward-twin') as HTMLElement & { set: (s: object) => void }).set({ playing: true }))
+  await expect.poll(async () => (await heard('twin-alert')).length, { timeout: 15_000 }).toBeGreaterThan(0)
+
+  // A setting the twin cannot take comes back as an error, and nothing else changes.
+  await page.evaluate(() => (document.querySelector('ward-twin') as HTMLElement & { set: (s: object) => void }).set({ playing: false, layer: 'heat' }))
+  await expect.poll(async () => (await heard('twin-error')).map((h) => h.key)).toEqual(['layer'])
+  await expect(twin.getByRole('radio', { name: 'Temperature' })).toHaveAttribute('aria-checked', 'true')
+})
+
+test('the demo host page drives the twin from its own controls', async ({ page }) => {
+  await page.goto('/host/')
+  const twin = page.frameLocator('ward-twin iframe')
+  await expect(page.locator('#now-at')).toHaveText('Wing 4A')
+  await expect(page.locator('#alerts li').first()).toBeVisible()
+  await page.getByRole('button', { name: 'Level 4' }).click()
+  await expect(twin.locator('.brand__where')).toContainText('Level 4 · six wings')
+  await page.getByLabel('Room or equipment').fill('4a09')
+  await page.getByRole('button', { name: 'Show' }).click()
+  await expect(page.locator('#now-select')).toHaveText('4A09')
+  await expect(twin.locator('.title')).toContainText('4A09')
+  expect(await page.evaluate(() => document.documentElement.scrollWidth - document.documentElement.clientWidth)).toBeLessThanOrEqual(0)
+})

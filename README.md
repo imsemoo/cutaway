@@ -10,7 +10,7 @@ Everything on screen is simulated. There is no real hospital, patient or reading
 
 The full film, 40 seconds, goes on to the way to the nearest free pump, the whole hospital and a level: [film/ward-twin-720.mp4](film/ward-twin-720.mp4), captured frame by frame on a controlled clock by `tools/film`.
 
-**Live:** https://imsemoo.github.io/ward-twin/ (add `?stats` for a frame meter, or open [live mode](https://imsemoo.github.io/ward-twin/?mode=live) or [the Arabic interface](https://imsemoo.github.io/ward-twin/?lang=ar))
+**Live:** https://imsemoo.github.io/ward-twin/ (add `?stats` for a frame meter, or open [live mode](https://imsemoo.github.io/ward-twin/?mode=live) or [the Arabic interface](https://imsemoo.github.io/ward-twin/?lang=ar), or see it [inside another page](https://imsemoo.github.io/ward-twin/host/))
 
 ## What it does
 
@@ -30,10 +30,11 @@ The full film, 40 seconds, goes on to the way to the nearest free pump, the whol
   - Digits stay Western, like the room numbers (4A09) and clock times they sit beside.
 - **Every view is a link.** The address bar keeps the view, layer, time and selection, so `?view=plan&layer=air&t=18:00&select=FAM` opens the family lounge at its stuffiest hour, `?at=level-4` a whole level and `?at=hospital` the whole hospital.
 - **Alerts that only know the present.** Each alert is worded at the replay minute ("Pressed at 14:21, 9 min without an answer"), so scrubbing never leaks what happens next.
+- **Inside another page.** A dashboard adds the twin with one script and one tag, `<ward-twin at="level-4">`, opens it on any room, layer or minute, and hears what happens in it: what was selected, the alerts open, and each alert as it opens. [A mock operations page](https://imsemoo.github.io/ward-twin/host/) shows it; [docs/embed.md](docs/embed.md) is the reference.
 
 ## How it is built
 
-The whole system on one page is in [docs/architecture.md](docs/architecture.md); the reasons behind it, in [nine short decision records](docs/decisions/README.md); and how it got here, with the numbers measured before and after each change, in [the making of](docs/making-of.md).
+The whole system on one page is in [docs/architecture.md](docs/architecture.md); the reasons behind it, in [ten short decision records](docs/decisions/README.md); and how it got here, with the numbers measured before and after each change, in [the making of](docs/making-of.md).
 
 - React 19, TypeScript, React Three Fiber, drei and three.js, bundled with Vite.
 - **The day is generated in a Web Worker** from a fixed seed, so the scene's first frame never waits on the simulation and every visitor replays the same day.
@@ -76,7 +77,11 @@ The whole system on one page is in [docs/architecture.md](docs/architecture.md);
   - Counts go through `Intl.PluralRules`, which gives Arabic its six forms. Placeholders are named, so each language puts the number where its grammar wants it.
   - The floor labels are troika text in Vazirmatn, which shapes and joins Arabic in WebGL.
   - A test parses the source with the TypeScript compiler, collects every string passed to `say()` and `plural()`, and fails if the catalogue misses one, drops a placeholder or keeps a string the interface no longer says.
-- **Code-split by weight.** What paints the interface loads first: 89.7 kB gzipped, the entry chunk and the two small chunks it imports, which the budget counts together. Live mode and the list view load when someone opens them. The scene and three.js follow (215 kB and 99 kB), then the model loader (20 kB). Ambient occlusion and SMAA load last, and only when the quality level uses them (157 kB, a third of it SMAA's lookup texture). CI enforces a budget for every chunk and for the first load.
+- **An embed kit.** `embed.js`, 1 kB gzipped, defines `<ward-twin>`, which runs the twin in an iframe and speaks a small `postMessage` protocol with it, in the words a link already uses: `at`, `select`, `layer`, `t`.
+  - The twin announces itself, the host connects, and from then on the twin takes commands only from that origin and posts only to it. A build can name the only hosts allowed, with `VITE_EMBED_ORIGINS`.
+  - Commands are checked by the same function that reads a link; one it cannot take comes back as an error and changes nothing.
+  - The twin's side loads only when it runs in a frame.
+- **Code-split by weight.** What paints the interface loads first: 90.6 kB gzipped, the entry chunk and the three small chunks it imports, which the budget counts together. Live mode and the list view load when someone opens them. The scene and three.js follow (215 kB and 99 kB), then the model loader (20 kB). Ambient occlusion and SMAA load last, and only when the quality level uses them (157 kB, a third of it SMAA's lookup texture). CI enforces a budget for every chunk and for the first load.
 - **The camera fits the building by projection:** it projects the floor's corners through a trial camera to find the distance and offset that keep the model clear of the overlays, and turns the building lengthwise on tall screens.
 - Reduced motion turns camera flights and the wall animation into cuts.
 
@@ -97,7 +102,7 @@ The on-screen meter (`?stats`) shows the frame rate while moving, draw calls, tr
 
 ## Tests
 
-- `npm test` runs 56 unit tests on the hospital plan, the simulation, the queries, the alert wording, the live feed, the wayfinding, the corridor field and the Arabic catalogue:
+- `npm test` runs 62 unit tests on the hospital plan, the simulation, the queries, the alert wording, the live feed, the wayfinding, the corridor field, the Arabic catalogue and the embed bridge:
   - six levels of six wings, with unique ids, every room inside its wing and no two rooms overlapping;
   - the same seed gives the same day, and every wing a day of its own;
   - more than 3,000 pieces of equipment, each only ever inside its own wing;
@@ -110,8 +115,9 @@ The on-screen meter (`?stats`) shows the frame rate while moving, draw calls, tr
   - the connection resumes after a drop, asks again after a gap, drops a silent link and backs off with jitter;
   - every room reaches every other; a way follows corridors and links, crosses to the next wing, the other row or another level when it must, and counts a lift ride in time but not in metres;
   - every room has a door on a corridor, and every wing matches the plan room for room, so the shader finds each reading where it looks;
-  - the Arabic catalogue covers every string the code says, with the same placeholders and nothing stale, and counts by Arabic's plural rules.
-- `npm run test:e2e` runs 16 browser tests at desktop and phone size, with real WebGL. They cover shared links, layers, the list view, search, playback, sideways scroll, recovery from a lost WebGL context, live mode through a server outage, the whole hospital, a level and a wing, the panel opening each new place at its top, the way to the nearest free pump, and the Arabic interface: right to left, remembered, and read from a link. Every test fails on a console error.
+  - the Arabic catalogue covers every string the code says, with the same placeholders and nothing stale, and counts by Arabic's plural rules;
+  - the embed bridge talks only to the page that connected, takes what a link takes and refuses the rest by name, reports an alert opening only while the clock runs forward, words alerts in the language on show, and reports the clock alone at most once a second.
+- `npm run test:e2e` runs 18 browser tests at desktop and phone size, with real WebGL. They cover shared links, layers, the list view, search, playback, sideways scroll, recovery from a lost WebGL context, live mode through a server outage, the whole hospital, a level and a wing, the panel opening each new place at its top, the way to the nearest free pump, the Arabic interface (right to left, remembered, and read from a link), and the twin embedded in a page on another origin that moves it and hears it. Every test fails on a console error.
 - `npm run check` runs types, lint, the unit tests, the build and the bundle budget. CI runs all of it, plus the browser tests, before every deploy; a failing check blocks the deploy.
 
 ## Run it

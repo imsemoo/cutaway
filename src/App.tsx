@@ -29,6 +29,7 @@ export default function App() {
   const lang = useLang((s) => s.lang)
   useSimulation()
   useLiveFeed()
+  useEmbed()
   usePlayback()
   useKeys()
   useEffect(syncUrl, [])
@@ -108,6 +109,22 @@ function useLiveFeed() {
       close?.()
     }
   }, [live])
+}
+
+/** In a frame, speaks the embed protocol with the page around it. Its code loads only there. */
+function useEmbed() {
+  useEffect(() => {
+    if (window.parent === window) return
+    let stop: (() => void) | undefined
+    let left = false
+    void import('./embed/bridge').then(({ bridge }) => {
+      if (!left) stop = bridge()
+    })
+    return () => {
+      left = true
+      stop?.()
+    }
+  }, [])
 }
 
 /** Advances the clock while playing, about twelve updates a second. */

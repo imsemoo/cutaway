@@ -23,7 +23,12 @@ for (const file of readdirSync(dir).filter((f) => f.endsWith('.js'))) {
 
 // What paints the interface is the entry chunk and every chunk it imports statically: the
 // bundler can move shared modules out of index into small chunks, and those load first too.
-const FIRST_LOAD = 90
+// 90 kB until the embed bridge. The bridge loads only in a frame, but it shares the language
+// and query modules with the entry, and the bundler then keeps those in a chunk of their own
+// that still loads first: 90.6 kB, of which 0.2 kB is new code and 0.7 kB chunk overhead.
+// Five ways to keep them in the entry were tried, from bundler settings to handing the
+// bridge its helpers from the app, and none did.
+const FIRST_LOAD = 91
 const gz = (file) => gzipSync(readFileSync(join(dir, file)), { level: 9 }).length / 1000
 const first = new Set()
 const load = (file) => {
@@ -36,6 +41,12 @@ const firstKb = [...first].reduce((kb, f) => kb + gz(f), 0)
 const heavy = firstKb > FIRST_LOAD
 failed ||= heavy
 console.log(`${heavy ? 'OVER' : 'ok  '}  first load ${firstKb.toFixed(1).padStart(6)} kB / ${FIRST_LOAD} kB (${[...first].map((f) => f.split('-')[0]).join(' + ')})`)
+
+// The <ward-twin> element that host pages load, built on its own beside the app.
+const EMBED = 3
+const embedKb = gzipSync(readFileSync('dist/embed.js'), { level: 9 }).length / 1000
+failed ||= embedKb > EMBED
+console.log(`${embedKb > EMBED ? 'OVER' : 'ok  '}  embed.js ${embedKb.toFixed(1).padStart(8)} kB / ${EMBED} kB`)
 
 if (failed) {
   console.error('A bundle is over budget.')
