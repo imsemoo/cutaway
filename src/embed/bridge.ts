@@ -111,6 +111,8 @@ export function bridge() {
     if (m.type === 'connect') {
       // An opaque origin, such as a page opened from a file, cannot be answered without answering everyone.
       if (e.origin === 'null') return
+      // The page that connected keeps the twin; only it can connect again, after the twin reloads.
+      if (host !== null && e.origin !== host) return
       host = e.origin
       sent = null
       listed = ''
@@ -149,5 +151,6 @@ function describeAlert(a: Alert, day: Day, t: number): TwinAlert {
     where: alertPlace(a, day),
     wing: alertWing(a) ?? '',
     since: clock(a.since),
+    opened: clock(a.from),
   }
 }

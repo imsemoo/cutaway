@@ -1,5 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { STORY, WING_BY_CODE } from '../data/floorplan'
+import { clock } from '../lib/query'
 import { setLang } from '../i18n'
 import { SEED, simulate } from '../sim/simulate'
 import { useWard } from '../state/store'
@@ -69,6 +70,10 @@ describe('the embed bridge', () => {
 
     twin.send({ type: 'set', layer: 'air' })
     expect(useWard.getState().layer).toBe('air')
+    // Once connected, the twin stays with that page.
+    twin.send({ type: 'connect' }, { origin: 'https://elsewhere.example' })
+    twin.send({ type: 'set', layer: 'temp' }, { origin: 'https://elsewhere.example' })
+    expect(useWard.getState().layer).toBe('air')
     expect(twin.posted.every((p) => p.origin === HOST || p.data.type === 'ready')).toBe(true)
   })
 
@@ -100,7 +105,8 @@ describe('the embed bridge', () => {
     twin = framed()
     twin.send({ type: 'connect' })
     useWard.getState().setT(first.from)
-    expect(twin.of('alert').map((p) => p.data.alert?.id)).toContain(first.id)
+    const heard = twin.of('alert').find((p) => p.data.alert?.id === first.id)?.data.alert
+    expect(heard?.opened).toBe(clock(first.from))
 
     const opened = twin.of('alert').length
     useWard.getState().setT(later.from + 120)

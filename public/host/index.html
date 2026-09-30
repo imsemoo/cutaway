@@ -230,7 +230,7 @@
     twin.addEventListener('twin-alert', (e) => {
       const { alert } = e.detail
       const latest = byId('latest')
-      latest.textContent = `Opened at ${twin.state?.t ?? ''}: `
+      latest.textContent = `Opened at ${alert.opened}: `
       const what = document.createElement('bdi')
       what.textContent = `${alert.title}, ${alert.where}`
       latest.append(what)

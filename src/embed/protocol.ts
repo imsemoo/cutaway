@@ -58,6 +58,8 @@ export interface TwinAlert {
   wing: string
   /** When what it is about began, "HH:MM": the call pressed, the bed vacated. */
   since: string
+  /** When the alert opened, "HH:MM". */
+  opened: string
 }
 
 export type HostMessage = { type: 'connect' } | ({ type: 'set' } & Settings)
