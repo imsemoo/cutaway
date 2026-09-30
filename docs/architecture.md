@@ -71,7 +71,7 @@ The day itself is computed in a worker ([decision 3](decisions/0003-simulate-in-
 ## Tests
 
 - 62 unit tests (Vitest): the plan, the simulation, the queries and alert wording, the live feed and its fold, the wayfinding graph, the corridor field's data, the Arabic catalogue, and the embed bridge in a fake frame.
-- 18 browser tests (Playwright), each at desktop and phone size with real WebGL, and each failing on any console error. One embeds the twin in a page on another origin.
+- 19 browser tests (Playwright), each at desktop and phone size with real WebGL, and each failing on any console error. One embeds the twin in a page on another origin.
 - Types, lint and the bundle budgets. CI runs all of it before every deploy to GitHub Pages.
 
 ## Decisions

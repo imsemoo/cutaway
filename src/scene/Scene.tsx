@@ -107,6 +107,7 @@ function ShadowOnDemand() {
 
 export default function Scene() {
   const level = useQuality((s) => s.level)
+  const lost = useQuality((s) => s.lost)
   // The opening shot looks straight down on the wing it opens on.
   const start = useMemo(() => middle(useWard.getState().scope), [])
   return (
@@ -135,7 +136,8 @@ export default function Scene() {
       <Route />
       <TagTracker />
       <CameraRig />
-      {level >= 2 && (
+      {/* Effects can arrive after the context is lost, and a composer set up on a lost context throws; the rebuilt canvas mounts them. */}
+      {level >= 2 && !lost && (
         <Suspense fallback={null}>
           <Effects smaa={level >= 3} />
         </Suspense>

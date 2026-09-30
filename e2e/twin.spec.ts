@@ -79,26 +79,39 @@ test('never scrolls sideways', async ({ page }) => {
   expect(overflow).toBeLessThanOrEqual(0)
 })
 
-test('a lost WebGL context pauses the scene and rebuilds it when restored', async ({ page }) => {
-  await page.goto('/')
-  await expect(page.locator('.alert').first()).toBeVisible()
-  await page.waitForTimeout(1500)
-  await page.evaluate(() => {
-    const canvas = document.querySelector('canvas')!
-    const gl = (canvas.getContext('webgl2') ?? canvas.getContext('webgl'))!
-    const ext = gl.getExtension('WEBGL_lose_context')!
-    ext.loseContext()
-    setTimeout(() => ext.restoreContext(), 800)
+// The effects (ambient occlusion and SMAA, desktop only) may be running when the context goes, or still on their way
+// over a slow connection and arrive while it is gone; either way the scene must pause and come back.
+for (const late of [false, true]) {
+  test(`a lost WebGL context pauses the scene and rebuilds it when restored${late ? ', with the effects arriving after the loss' : ''}`, async ({ page }) => {
+    let release = () => {}
+    const lostFirst = new Promise<void>((resolve) => (release = resolve))
+    if (late) {
+      await page.route('**/assets/Effects-*.js', async (route) => {
+        await lostFirst
+        await route.continue()
+      })
+    }
+    await page.goto('/')
+    await expect(page.locator('.alert').first()).toBeVisible()
+    await page.waitForTimeout(1500)
+    await page.evaluate(() => {
+      const canvas = document.querySelector('canvas')!
+      const gl = (canvas.getContext('webgl2') ?? canvas.getContext('webgl'))!
+      const ext = gl.getExtension('WEBGL_lose_context')!
+      ext.loseContext()
+      setTimeout(() => ext.restoreContext(), 800)
+    })
+    release()
+    await expect(page.getByText('The 3D view paused')).toBeVisible()
+    await expect(page.getByText('The 3D view paused')).toBeHidden()
+    await expect(page.locator('canvas')).toBeVisible()
+    const lost = await page.evaluate(() => {
+      const canvas = document.querySelector('canvas')!
+      return (canvas.getContext('webgl2') ?? canvas.getContext('webgl'))!.isContextLost()
+    })
+    expect(lost).toBe(false)
   })
-  await expect(page.getByText('The 3D view paused')).toBeVisible()
-  await expect(page.getByText('The 3D view paused')).toBeHidden()
-  await expect(page.locator('canvas')).toBeVisible()
-  const lost = await page.evaluate(() => {
-    const canvas = document.querySelector('canvas')!
-    return (canvas.getContext('webgl2') ?? canvas.getContext('webgl'))!.isContextLost()
-  })
-  expect(lost).toBe(false)
-})
+}
 
 test('live mode streams the day, and catches up after the server goes down', async ({ page }) => {
   await page.goto('/?mode=live')
