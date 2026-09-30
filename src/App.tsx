@@ -138,8 +138,11 @@ function usePlayback() {
   useEffect(() => {
     if (!playing) return
     let raf = 0
-    let last = performance.now()
+    // Measured from the first frame's own timestamp: a frame's clock need not be performance.now()'s,
+    // and under the film's fake clock the two differed by hours, so the first step jumped the day ahead.
+    let last = -1
     const loop = (now: number) => {
+      if (last < 0) last = now
       const elapsed = now - last
       if (elapsed >= 80) {
         last = now

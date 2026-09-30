@@ -8,7 +8,7 @@ Everything on screen is simulated. There is no real hospital, patient or reading
 
 ![The opening shot and the four layers](film/ward-twin-loop.webp)
 
-The full film, 40 seconds, goes on to the way to the nearest free pump, the whole hospital and a level: [film/ward-twin-720.mp4](film/ward-twin-720.mp4), captured frame by frame on a controlled clock by `tools/film`.
+The full film, 58 seconds, goes on to the way to the nearest free pump, the whole hospital and a level, the interface in Arabic, and the twin inside another page that opens a room in it and hears its alerts: [film/ward-twin-720.mp4](film/ward-twin-720.mp4), captured frame by frame on a controlled clock by `tools/film`.
 
 **Live:** https://imsemoo.github.io/ward-twin/ (add `?stats` for a frame meter, or open [live mode](https://imsemoo.github.io/ward-twin/?mode=live) or [the Arabic interface](https://imsemoo.github.io/ward-twin/?lang=ar), or see it [inside another page](https://imsemoo.github.io/ward-twin/host/))
 

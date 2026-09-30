@@ -80,6 +80,29 @@ await hold(3.0)
 await radio('3D')
 await page.getByRole('button', { name: /^Level 4, A wing:/ }).filter({ visible: true }).first().click()
 await hold(3.5)
+// In Arabic: the interface turns right to left, the names on the floors with it.
+await page.getByRole('button', { name: 'العربية' }).click()
+await page.waitForTimeout(1500) // the catalogue and the Arabic face, fetched on real time
+await hold(4.5)
+await page.getByRole('button', { name: 'English' }).click()
+await page.waitForTimeout(800)
+
+// Inside another page: a mock operations dashboard frames the twin and talks to it.
+await page.goto(BASE + 'host/', { waitUntil: 'load' })
+for (let i = 0; i < 150 && !(await page.locator('#alerts li').count()); i++) await page.waitForTimeout(100)
+await page.waitForTimeout(1500)
+await hold(2.5)
+// The dashboard names a room, and the twin flies to it.
+await page.locator('#room').fill('4A09')
+await page.getByRole('button', { name: 'Show', exact: true }).click()
+await hold(3.0)
+// It plays the day, and hears each alert as it opens.
+await page.getByRole('button', { name: 'Play the day' }).click()
+await hold(4.5)
+await page.getByRole('button', { name: 'Pause' }).click()
+// An alert in its own list opens the room it is about.
+await page.locator('#alerts .alert').first().click()
+await hold(3.0)
 
 console.log(`${frame} frames, ${(frame / FPS).toFixed(1)} s`)
 await browser.close()
