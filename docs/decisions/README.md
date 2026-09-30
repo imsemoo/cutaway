@@ -12,3 +12,4 @@ Short records of the choices that shaped Ward Twin: what forced each one, what w
 8. [English is the key for the Arabic interface](0008-english-is-the-key.md)
 9. [A budget for every chunk, and for the first load](0009-budgets.md)
 10. [Embed through an iframe, with the link's own words](0010-embed-through-an-iframe.md)
+11. [The model is one keyboard widget](0011-the-model-is-one-keyboard-widget.md)

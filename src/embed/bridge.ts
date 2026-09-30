@@ -1,7 +1,8 @@
 import type { Alert, Day } from '../data/types'
 import { setLang, useLang } from '../i18n'
 import { alertTitle, describe, severityAt } from '../lib/alerts'
-import { activeAlerts, alertWing, assetLabel, clock, roomName } from '../lib/query'
+import { alertWing, clock } from '../lib/query'
+import { alertPlace, alertWatch } from '../lib/watch'
 import { scopeToParam } from '../state/scope'
 import { readParams, useWard } from '../state/store'
 import { PROTOCOL, type Envelope, type HostMessage, type Settings, type TwinAlert, type TwinMessage, type TwinState } from './protocol'
@@ -17,8 +18,6 @@ const ALLOWED = (import.meta.env.VITE_EMBED_ORIGINS ?? '')
   .filter(Boolean)
 
 const SETTINGS = new Set(['at', 'select', 'view', 'layer', 't', 'mode', 'lang', 'playing'])
-/** An alert that opens further back than this was skipped over, not seen opening. */
-const STEP = 30
 
 export function bridge() {
   const parent = window.parent
@@ -84,17 +83,12 @@ export function bridge() {
 
   // The alerts open at the twin's minute, and the ones seen opening while the clock ran forward.
   let listed = ''
-  let open = new Set<string>()
-  let seen: { t: number; day: Day | null; mode: string } = { t: 0, day: null, mode: '' }
+  let watch = alertWatch()
   function sendAlerts() {
-    const { day, t, mode, playing } = useWard.getState()
-    const now = day ? activeAlerts(day, t) : []
-    const running = playing || mode === 'live'
-    if (day && running && seen.day && seen.mode === mode && t >= seen.t && t - seen.t <= STEP) {
-      for (const a of now) if (!open.has(a.id) && a.from >= seen.t) post({ type: 'alert', alert: describeAlert(a, day, t) })
-    }
-    open = new Set(now.map((a) => a.id))
-    seen = { t, day, mode }
+    const s = useWard.getState()
+    const { day, t } = s
+    const { open: now, opened } = watch(s)
+    if (day) for (const a of opened) post({ type: 'alert', alert: describeAlert(a, day, t) })
     const key = useLang.getState().lang + now.map((a) => a.id + (day ? severityAt(a, day, t) : '')).join()
     if (key === listed) return
     listed = key
@@ -120,7 +114,7 @@ export function bridge() {
       host = e.origin
       sent = null
       listed = ''
-      seen = { t: 0, day: null, mode: '' }
+      watch = alertWatch()
       onChange()
     } else if (m.type === 'set' && e.origin === host) {
       applying = true
@@ -145,7 +139,6 @@ export function bridge() {
 }
 
 function describeAlert(a: Alert, day: Day, t: number): TwinAlert {
-  const asset = a.target.type === 'asset' ? day.assets.find((x) => x.id === a.target.id) : undefined
   return {
     id: a.id,
     kind: a.kind,
@@ -153,7 +146,7 @@ function describeAlert(a: Alert, day: Day, t: number): TwinAlert {
     title: alertTitle(a),
     text: describe(a, day, t),
     target: a.target,
-    where: asset ? `${assetLabel(asset.kind)} ${asset.id}` : roomName(a.target.id),
+    where: alertPlace(a, day),
     wing: alertWing(a) ?? '',
     since: clock(a.since),
   }

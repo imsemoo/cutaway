@@ -29,7 +29,7 @@ flowchart LR
 | `live` | The feed protocol, the event log and its fold into a `Day`, the client with resume and backoff, and the mock server. Loaded only in live mode. |
 | `state` | The store (zustand), the scope (hospital, level or wing) and the adaptive quality level. |
 | `lib` | Queries over a day at a minute, alert wording, colours, equipment positions, wayfinding. |
-| `scene` | Everything in the canvas: the instanced shell, floors and corridors, the models, level of detail, the camera, effects, shadows, and the tracker that places the tags. |
+| `scene` | Everything in the canvas: the instanced shell, floors and corridors, the models, level of detail, the camera, effects, shadows, the tracker that places the tags, and the keyboard cursor ([decision 11](decisions/0011-the-model-is-one-keyboard-widget.md)). |
 | `ui` | Everything around the canvas: the top bar, the panel, the timeline, the layer switch and key, the list view, the tags, the building map. |
 | `i18n` | `say()` and `plural()`, and the Arabic catalogue. |
 | `embed` | The protocol a host page speaks with the twin in a frame, the bridge on the twin's side, and the `<ward-twin>` element built into `embed.js` for the host ([decision 10](decisions/0010-embed-through-an-iframe.md), [embed.md](embed.md)). |
@@ -54,7 +54,7 @@ The story wing, level 4's A wing, keeps a scripted afternoon; the other 35 are s
 
 | Chunk | Gzipped | When |
 |---|---|---|
-| Entry and the three small chunks it imports | 90.6 kB | first, before the interface paints |
+| Entry and the three small chunks it imports | 90.8 kB | first, before the interface paints |
 | Scene | 215 kB | after the interface has painted |
 | three.js core | 99 kB | with the scene |
 | glTF loader and meshopt | 20 kB | with the models |
@@ -63,15 +63,17 @@ The story wing, level 4's A wing, keeps a scripted afternoon; the other 35 are s
 | Live mode | 2.1 kB | when live mode is turned on |
 | List view | 1.3 kB | when the list view is opened |
 | Wayfinding | 1.4 kB | on the first request for a way |
-| Embed bridge | 1.4 kB | only when the twin runs in a frame |
+| Embed bridge | 1.3 kB | only when the twin runs in a frame |
+| Alerts read aloud | 0.9 kB | after the interface has painted |
 | `embed.js`, the `<ward-twin>` element | 1.0 kB | on the host's page |
 
 The day itself is computed in a worker ([decision 3](decisions/0003-simulate-in-a-worker.md)). Every chunk and the first load have budgets that block the deploy ([decision 9](decisions/0009-budgets.md)).
 
 ## Tests
 
-- 62 unit tests (Vitest): the plan, the simulation, the queries and alert wording, the live feed and its fold, the wayfinding graph, the corridor field's data, the Arabic catalogue, and the embed bridge in a fake frame.
-- 19 browser tests (Playwright), each at desktop and phone size with real WebGL, and each failing on any console error. One embeds the twin in a page on another origin.
+- 66 unit tests (Vitest): the plan, the simulation, the queries and alert wording, the live feed and its fold, the wayfinding graph, the corridor field's data, the Arabic catalogue, the embed bridge in a fake frame, and the keyboard cursor's steps.
+- 21 browser tests (Playwright), each at desktop and phone size with real WebGL, and each failing on any console error. One embeds the twin in a page on another origin; one drives the model from the keyboard.
+- axe-core checks of eight views against WCAG 2.2 A and AA, at both sizes, run as a later stage so their weight never crowds the timing-sensitive live-mode test.
 - Types, lint and the bundle budgets. CI runs all of it before every deploy to GitHub Pages.
 
 ## Decisions

@@ -13,6 +13,16 @@ export default {
   'Ward Twin: a 3D digital twin of a hospital': 'Ward Twin: توأم رقمي ثلاثي الأبعاد لمستشفى',
   'Skip to details': 'انتقل إلى التفاصيل',
   'Floor model': 'نموذج الطابق',
+  '3D model of the hospital': 'النموذج الثلاثي الأبعاد للمستشفى',
+  'Arrow keys move between rooms. Enter opens one, Escape steps back out, Space plays the day.':
+    'تنقّلك مفاتيح الأسهم بين الغرف، ويفتح Enter الغرفة، ويعود Escape خطوة إلى الخلف، ويشغّل مفتاح المسافة اليوم.',
+  'Arrow keys move between wings. Enter opens one, Escape steps back out, Space plays the day.':
+    'تنقّلك مفاتيح الأسهم بين الأجنحة، ويفتح Enter الجناح، ويعود Escape خطوة إلى الخلف، ويشغّل مفتاح المسافة اليوم.',
+  '{name}, {reading}': '{name}، {reading}',
+  'No room further that way.': 'لا غرفة أبعد في هذا الاتجاه.',
+  'No wing further that way.': 'لا جناح أبعد في هذا الاتجاه.',
+  'New alert: {alert}.': 'تنبيه جديد: {alert}.',
+  '{count}: {alerts}.': '{count}: {alerts}.',
   'Connecting to the live feed…': 'جارٍ الاتصال بالبث المباشر…',
   'Building the simulated day…': 'جارٍ بناء اليوم المُحاكى…',
   'The 3D view paused: the graphics driver reset. It restarts on its own when the browser allows.':
@@ -252,6 +262,7 @@ export default {
   '{n} h': { one: 'ساعة', two: 'ساعتان', few: '{n} ساعات', many: '{n} ساعة', other: '{n} ساعة' },
   '{n} s away': { few: '{n} ثوانٍ سيرًا', many: '{n} ثانية سيرًا', other: '{n} ثانية سيرًا' },
   '{n} min away': { one: 'دقيقة واحدة سيرًا', two: 'دقيقتان سيرًا', few: '{n} دقائق سيرًا', many: '{n} دقيقة سيرًا', other: '{n} دقيقة سيرًا' },
+  '{n} new alerts': { one: 'تنبيه جديد واحد', two: 'تنبيهان جديدان', few: '{n} تنبيهات جديدة', many: '{n} تنبيهًا جديدًا', other: '{n} تنبيه جديد' },
   '{n} alerts': { zero: 'لا تنبيهات', one: 'تنبيه واحد', two: 'تنبيهان', few: '{n} تنبيهات', many: '{n} تنبيهًا', other: '{n} تنبيه' },
   '{n} beds': { one: 'سرير واحد', two: 'سريران', few: '{n} أسرّة', many: '{n} سريرًا', other: '{n} سرير' },
   '{n} wings': { one: 'جناح واحد', two: 'جناحان', few: '{n} أجنحة', many: '{n} جناحًا', other: '{n} جناح' },

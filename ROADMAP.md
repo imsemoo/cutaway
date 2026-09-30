@@ -99,4 +99,4 @@ A `<ward-twin>` web component and a postMessage API, so a host dashboard can sel
 - [x] 3.1 Arabic, right to left: the whole interface, the alerts and the floor labels, mirrored where Arabic reads that way; the first load stays at 90 kB
 - [x] 3.2 Architecture notes: an architecture page, nine decision records, and a making-of with the numbers before and after each change
 - [x] 3.3 Embed API: `<ward-twin>` in a 1 kB `embed.js`, a postMessage protocol in the link's own words, origin-locked after a handshake; a demo host page at /host/; docs/embed.md and decision 10
-- [ ] 3.4
+- [x] 3.4 Accessibility: the model as one keyboard widget (arrow keys by screen direction, Enter, Escape, each move said aloud), alerts said as they open, axe-core checks of eight views at two sizes in CI; decision 11. Not yet tried with a daily screen-reader user

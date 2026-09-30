@@ -79,7 +79,8 @@ export function Floors() {
     slots.forEach((r, i) => {
       if (day) roomColor(day, r, t, layer, c)
       else c.set(NEUTRAL_FLOOR)
-      if (hover === r.id) c.lerp(white, 0.45)
+      // The hover is a room, or, from the keyboard in a level or the whole hospital, a wing.
+      if (hover === r.id || hover === r.wing) c.lerp(white, 0.45)
       mesh.setColorAt(i, c)
     })
     if (mesh.instanceColor) mesh.instanceColor.needsUpdate = true

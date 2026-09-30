@@ -16,6 +16,8 @@ import { TopBar } from './ui/TopBar'
 // The 3D bundle loads after the interface shell has painted; the table, only when someone opens the list view.
 const Scene = lazy(() => import('./scene/Scene'))
 const ListView = lazy(() => import('./ui/ListView'))
+// Alerts are spoken once the day runs, never before the first paint.
+const AlertAnnouncer = lazy(() => import('./ui/AlertAnnouncer'))
 
 export default function App() {
   // Only whether the day covers what is on show: in live mode the day changes every second, and the whole tree need not follow.
@@ -75,6 +77,9 @@ export default function App() {
         <Panel />
       </div>
       <Announcer />
+      <Suspense fallback={null}>
+        <AlertAnnouncer />
+      </Suspense>
     </div>
   )
 }

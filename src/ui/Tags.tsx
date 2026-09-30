@@ -1,9 +1,9 @@
 import { useLayoutEffect, useRef } from 'react'
-import { LEVELS, PLATE, ROOM_BY_ID, WING, center } from '../data/floorplan'
+import { LEVELS, PLATE, ROOM_BY_ID, WING, WING_BY_CODE, center } from '../data/floorplan'
 import type { Day, Layer } from '../data/types'
 import { BED } from '../lib/colors'
 import { say } from '../i18n'
-import { activeCall, assetAt, assetLabel, bedAt, bedLabel, roomTitle, sample, statusLabel, walking } from '../lib/query'
+import { activeCall, assetAt, assetLabel, bedAt, bedLabel, roomTitle, sample, statusLabel, walking, wingName } from '../lib/query'
 import { assetPositions } from '../lib/positions'
 import { RIM, levelY } from '../scene/layout'
 import { HOSPITAL, levelScope, scopeLevel, scopeWings } from '../state/scope'
@@ -33,7 +33,7 @@ export function Tags() {
     <div className="tags" aria-hidden="true">
       {scopeLevel(scope) &&
         scopeWings(levelScope(scopeLevel(scope)!)).map((w) => (
-          <Tag key={`wing-${w.code}`} slot={`wing-${w.code}`} x={w.x + WING.w / 2} y={levelY(w.level) + 3.2} z={w.z} quiet>
+          <Tag key={`wing-${w.code}`} slot={`wing-${w.code}`} x={w.x + WING.w / 2} y={levelY(w.level) + 3.2} z={w.z} quiet={hover !== w.code} strong={hover === w.code}>
             <span className="tag__id">
               <span className="tag__more">{before}</span>
               {w.code}
@@ -47,6 +47,11 @@ export function Tags() {
             <span className="tag__id">{say('Level {level}', { level })}</span>
           </Tag>
         ))}
+      {scope === HOSPITAL && hover && WING_BY_CODE[hover] && (
+        <Tag key="hover-wing" slot="hover-wing" x={WING_BY_CODE[hover].x + WING.w / 2} y={levelY(WING_BY_CODE[hover].level) + 3.2} z={WING_BY_CODE[hover].z} strong>
+          <span className="tag__id">{wingName(WING_BY_CODE[hover])}</span>
+        </Tag>
+      )}
       {selRoom && <RoomTag key="sel" slot="sel" id={selRoom} day={day} t={t} layer={layer} plan={plan} strong />}
       {hover && hover !== selRoom && <RoomTag key="hover" slot="hover" id={hover} day={day} t={t} layer={layer} plan={plan} />}
       {route && end && (
@@ -67,33 +72,38 @@ export function Tags() {
   )
 }
 
+/** What a room's tag says in a layer at minute t: its bed, its reading or its call light. The keyboard cursor announces it too. */
+export function roomReading(day: Day, id: string, t: number, layer: Layer) {
+  const r = ROOM_BY_ID[id]
+  const bed = bedAt(day, id, t)
+  const env = day.rooms[id]
+  const call = activeCall(day, id, t)
+  return layer === 'temp'
+    ? say('{v} °C', { v: sample(env.temp, t).toFixed(1) })
+    : layer === 'air'
+      ? say('{v} ppm CO₂', { v: Math.round(sample(env.co2, t)).toLocaleString('en-US') })
+      : layer === 'calls'
+        ? call
+          ? say('Call light, {n} min', { n: Math.max(0, t - call.at).toFixed(0) })
+          : say('No call light')
+        : bed
+          ? bedLabel(bed.state)
+          : r.kind === 'station'
+            ? say('Staff area')
+            : say('Support space')
+}
+
 function RoomTag({ slot, id, day, t, layer, plan, strong }: { slot: string; id: string; day: Day; t: number; layer: Layer; plan: boolean; strong?: boolean }) {
   const r = ROOM_BY_ID[id]
   if (!r) return null
   const c = center(r)
   const bed = bedAt(day, id, t)
-  const env = day.rooms[id]
-  const call = activeCall(day, id, t)
-  const metric =
-    layer === 'temp'
-      ? say('{v} °C', { v: sample(env.temp, t).toFixed(1) })
-      : layer === 'air'
-        ? say('{v} ppm CO₂', { v: Math.round(sample(env.co2, t)).toLocaleString('en-US') })
-        : layer === 'calls'
-          ? call
-            ? say('Call light, {n} min', { n: Math.max(0, t - call.at).toFixed(0) })
-            : say('No call light')
-          : bed
-            ? bedLabel(bed.state)
-            : r.kind === 'station'
-              ? say('Staff area')
-              : say('Support space')
   return (
     <Tag slot={slot} x={c.x} y={levelY(r.level) + (plan ? 0.5 : 3.1)} z={c.z} strong={strong}>
       <span className="tag__id">{roomTitle(r)}</span>
       <span className="tag__meta">
         {layer === 'beds' && bed && <i className="tag__dot" style={{ background: BED[bed.state].strong }} />}
-        {metric}
+        {roomReading(day, id, t, layer)}
       </span>
     </Tag>
   )

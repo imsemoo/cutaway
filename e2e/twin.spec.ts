@@ -290,3 +290,40 @@ test('the demo host page drives the twin from its own controls', async ({ page }
   await expect(twin.locator('.title')).toContainText('4A09')
   expect(await page.evaluate(() => document.documentElement.scrollWidth - document.documentElement.clientWidth)).toBeLessThanOrEqual(0)
 })
+
+test('the model works from the keyboard: rooms, then wings, each one said aloud', async ({ page }) => {
+  await page.goto('/')
+  await expect(page.locator('.alert').first()).toBeVisible()
+  const model = page.getByRole('application', { name: '3D model of the hospital' })
+  const said = page.locator('#model-said')
+  await model.focus()
+  // The canvas can be on the page a moment before the scene inside it listens.
+  await expect(async () => {
+    await page.keyboard.press('ArrowRight')
+    await expect(said).not.toHaveText('', { timeout: 1000 })
+  }).toPass()
+  await expect(said).toHaveText(/^(Patient room|ICU bay|[A-Z])/)
+  const first = await said.textContent()
+  await page.keyboard.press('ArrowRight')
+  await expect(said).not.toHaveText(first ?? '')
+  await page.keyboard.press('Enter')
+  await expect(page).toHaveURL(/select=/)
+  // Escape clears the selection, then steps out to the level, with the cursor on the wing it left.
+  await page.keyboard.press('Escape')
+  await expect(page).not.toHaveURL(/select=/)
+  await page.keyboard.press('Escape')
+  await expect(page).toHaveURL(/at=level-4/)
+  await expect(said).toContainText('Level 4. Level 4, A wing:')
+  await page.keyboard.press('ArrowRight')
+  // Right on screen: on a phone the level is turned lengthwise, so which wing that is depends on the screen.
+  await expect(said).toHaveText(/^Level 4, [B-Z] wing: \d+ of \d+ beds occupied/)
+  await page.keyboard.press('Enter')
+  await expect(page).toHaveURL(/at=4[b-z]/)
+})
+
+test('alerts that open while the day plays are said aloud', async ({ page }) => {
+  await page.goto('/?t=13:00')
+  await expect(page.getByRole('heading', { name: /Beds at\s+13:00/ })).toBeVisible()
+  await page.getByRole('button', { name: 'Play the day' }).click()
+  await expect(page.locator('[aria-live="polite"]').filter({ hasText: /new alert/i })).toHaveCount(1, { timeout: 20_000 })
+})

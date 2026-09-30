@@ -3,8 +3,9 @@ import { Canvas, useFrame, useThree } from '@react-three/fiber'
 import { Suspense, lazy, useLayoutEffect, useMemo, useRef } from 'react'
 import { Object3D, type DirectionalLight } from 'three'
 import { PLATE, WING, WING_BY_CODE } from '../data/floorplan'
+import { say, useLang } from '../i18n'
 import { START, dprFor, useQuality } from '../state/quality'
-import { HOSPITAL, scopeLevel, type Scope } from '../state/scope'
+import { HOSPITAL, isWing, scopeLevel, type Scope } from '../state/scope'
 import { useWard } from '../state/store'
 import { Beds } from './Beds'
 import { CameraRig } from './CameraRig'
@@ -12,6 +13,7 @@ import { Equipment } from './Equipment'
 import { Corridors } from './Corridors'
 import { Floors } from './Floors'
 import { FrameMeter } from './FrameMeter'
+import { KeyboardCursor } from './Keyboard'
 import { Overlays } from './Overlays'
 import { Route } from './Route'
 import { AdaptiveQuality, ContextWatch } from './Resilience'
@@ -108,43 +110,61 @@ function ShadowOnDemand() {
 export default function Scene() {
   const level = useQuality((s) => s.level)
   const lost = useQuality((s) => s.lost)
+  const wing = useWard((s) => isWing(s.scope))
+  const list = useWard((s) => s.view === 'list')
+  // A new language relabels the model.
+  useLang((s) => s.lang)
   // The opening shot looks straight down on the wing it opens on.
   const start = useMemo(() => middle(useWard.getState().scope), [])
   return (
-    <Canvas
-      frameloop="demand"
-      flat
-      shadows="percentage"
-      dpr={dprFor(START)}
-      camera={{ fov: 35, near: 0.5, far: 2400, position: [start.x, start.y + 150, start.z + 0.5] }}
-      gl={{ antialias: true, powerPreference: 'high-performance' }}
-      aria-label="3D model of the hospital"
-      // Half-resolution AO smears the first rows of pixels; the canvas starts above the stage so they stay hidden.
-      style={{ position: 'absolute', inset: '-8px 0 0 0', height: 'auto' }}
-    >
-      <color attach="background" args={['#e8ecf0']} />
-      <hemisphereLight args={['#ffffff', '#cdd4dc', 1.35]} />
-      <Sun />
-      <ShadowOnDemand />
-      <Ground />
-      <Shell />
-      <Corridors />
-      <Floors />
-      <Beds />
-      <Equipment />
-      <Overlays />
-      <Route />
-      <TagTracker />
-      <CameraRig />
-      {/* Effects can arrive after the context is lost, and a composer set up on a lost context throws; the rebuilt canvas mounts them. */}
-      {level >= 2 && !lost && (
-        <Suspense fallback={null}>
-          <Effects smaa={level >= 3} />
-        </Suspense>
-      )}
-      <AdaptiveQuality />
-      <ContextWatch />
-      {stats && <FrameMeter />}
-    </Canvas>
+    <>
+      <Canvas
+        className="model"
+        // The model takes the arrow keys itself (Keyboard.tsx), so screen readers pass them through.
+        role="application"
+        tabIndex={list ? -1 : 0}
+        aria-label={say('3D model of the hospital')}
+        aria-describedby="model-keys"
+        frameloop="demand"
+        flat
+        shadows="percentage"
+        dpr={dprFor(START)}
+        camera={{ fov: 35, near: 0.5, far: 2400, position: [start.x, start.y + 150, start.z + 0.5] }}
+        gl={{ antialias: true, powerPreference: 'high-performance' }}
+        // Half-resolution AO smears the first rows of pixels; the canvas starts above the stage so they stay hidden.
+        style={{ position: 'absolute', inset: '-8px 0 0 0', height: 'auto' }}
+      >
+        <color attach="background" args={['#e8ecf0']} />
+        <hemisphereLight args={['#ffffff', '#cdd4dc', 1.35]} />
+        <Sun />
+        <ShadowOnDemand />
+        <Ground />
+        <Shell />
+        <Corridors />
+        <Floors />
+        <Beds />
+        <Equipment />
+        <Overlays />
+        <Route />
+        <TagTracker />
+        <CameraRig />
+        {/* Effects can arrive after the context is lost, and a composer set up on a lost context throws; the rebuilt canvas mounts them. */}
+        {level >= 2 && !lost && (
+          <Suspense fallback={null}>
+            <Effects smaa={level >= 3} />
+          </Suspense>
+        )}
+        <AdaptiveQuality />
+        <ContextWatch />
+        <KeyboardCursor />
+        {stats && <FrameMeter />}
+      </Canvas>
+      <p id="model-keys" className="model-keys">
+        {wing
+          ? say('Arrow keys move between rooms. Enter opens one, Escape steps back out, Space plays the day.')
+          : say('Arrow keys move between wings. Enter opens one, Escape steps back out, Space plays the day.')}
+      </p>
+      <p id="model-said" className="sr-only" aria-live="polite" />
+    </>
   )
 }

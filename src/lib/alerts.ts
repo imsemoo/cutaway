@@ -48,3 +48,4 @@ export function severityAt(alert: Alert, day: Day, t: number): Severity {
       return alert.severity
   }
 }
+

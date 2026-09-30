@@ -53,6 +53,14 @@ Five ways around it were measured: two bundler settings, a hand-made React chunk
 
 The unit tests found one real fault in the bridge. A host that set a room and a time in one command heard about the room at once and the time a second later: each change was reported on its own, and the clock is throttled to once a second so that a playing day does not flood the host. A host's command is now applied whole and reported once.
 
+## A race the CI found
+
+The embed's first push failed CI in a test that had passed on every push before it: a lost WebGL context should pause the scene and rebuild it, and instead the scene fell back to the message for browsers without WebGL. On the slower CI machine the effects chunk, 157 kB of ambient occlusion and SMAA, arrived after the test had lost the context, and the effect composer set itself up on a dead context and threw. The test now runs twice, once with the effects already running and once holding their chunk back until after the loss, which fails without the fix every time. The effects now mount only on a live context.
+
+## Accessible, and checked
+
+The model became one keyboard stop that takes the arrow keys ([decision 11](decisions/0011-the-model-is-one-keyboard-widget.md)), and axe-core now checks eight views at two sizes on every push. Its first run found a single violation, repeated on every view: the canvas's container had a label and no role. Adding the checks also showed something about the tests themselves. Run beside the live-mode test, their weight starved its pages, which render WebGL on the CPU, until the feed's four-second silence check dropped every link; with this change set aside, the same crowding failed the same way. The checks now run as a stage of their own, after the rest.
+
 ## Not measured yet
 
-Every number here comes from one laptop and emulated phones. A low-end Android phone and an iPhone are the tests the project still needs.
+Every number here comes from one laptop and emulated phones. A low-end Android phone and an iPhone are the tests the project still needs, and so is an afternoon with someone who uses a screen reader every day.
