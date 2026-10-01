@@ -1,9 +1,9 @@
-import { ArrowLeft, BatteryLow, BellRing, Building2, Info, OctagonAlert, Play, TriangleAlert, Unplug } from 'lucide-react'
-import { useLayoutEffect, useRef, useState } from 'react'
+import { ArrowLeft, BatteryLow, BellRing, Building2, Play, Unplug } from 'lucide-react'
+import { Suspense, lazy, useEffect, useLayoutEffect, useRef, useState } from 'react'
 import { BED_ROOMS, LEVELS, ROOMS, ROOM_BY_ID, STORY, WINGS, WING_BY_CODE, type Wing } from '../data/floorplan'
 import type { Alert, Asset, AssetKind, BedState, Day, Room, Severity } from '../data/types'
 import { plural, say } from '../i18n'
-import { alertTitle, describe, severityAt } from '../lib/alerts'
+import { severityAt } from '../lib/alerts'
 import { ASSET_STATUS, BED, SEVERITY } from '../lib/colors'
 import {
   activeAlerts,
@@ -30,7 +30,14 @@ import { covers, useWard } from '../state/store'
 import { DayChart, StateStrip } from './Chart'
 import { wingSummaries, type WingSummary } from './summary'
 
-const SEV_ICON: Record<Severity, typeof Info> = { critical: OctagonAlert, warning: TriangleAlert, info: Info }
+// The alert list with its actions and the forecast show nothing before the day arrives, after the first paint, so they load then.
+const alertsModule = () => import('./Alerts')
+const aheadModule = () => import('./Ahead')
+const AlertList = lazy(() => alertsModule().then((m) => ({ default: m.AlertList })))
+const AlertHistory = lazy(() => alertsModule().then((m) => ({ default: m.AlertHistory })))
+const Ahead = lazy(aheadModule)
+const RoomPlan = lazy(() => aheadModule().then((m) => ({ default: m.RoomPlan })))
+
 /** A span that is still going on (live mode) ends now, as far as anyone knows. */
 const until = (to: number) => (Number.isFinite(to) ? clock(to) : say('now'))
 const STATES: BedState[] = ['occupied', 'ready', 'cleaning', 'dirty', 'blocked']
@@ -66,6 +73,11 @@ export function Panel() {
     // A block, not an expression: scrollTo now returns a promise, which React would take for a cleanup.
     aside.current?.scrollTo({ top: 0 })
   }, [place])
+  // Fetched while the day is being built, so they are in hand when it arrives.
+  useEffect(() => {
+    void alertsModule()
+    void aheadModule()
+  }, [])
   return (
     <aside ref={aside} className="panel" aria-label={say('Details')}>
       {!day || !ready ? (
@@ -155,6 +167,25 @@ function ranked(day: Day, t: number, keep: (a: Alert) => boolean = () => true) {
     .sort((a, b) => RANK[severityAt(a, day, t)] - RANK[severityAt(b, day, t)] || a.from - b.from)
 }
 
+/** "Needs attention", with how many are open and how many no one has acknowledged yet. */
+function AttentionHeading({ alerts, day, t }: { alerts: Alert[]; day: Day; t: number }) {
+  const fresh = alerts.filter((a) => !day.actions.some((x) => x.alert === a.id && x.at <= t)).length
+  return (
+    <h2 className="h2">
+      {say('Needs attention')} <span className="count num">{alerts.length}</span>
+      {fresh > 0 && fresh < alerts.length && (
+        <>
+          <span className="sr-only">,</span>
+          <span className="count count--new num">{plural(fresh, '{n} new', '{n} new')}</span>
+        </>
+      )}
+    </h2>
+  )
+}
+
+/** Room for the list while its code arrives, so the panel below does not jump. */
+const Holding = ({ n }: { n: number }) => <div className="skel skel--block" style={{ height: Math.min(n, 4) * 76 }} aria-hidden="true" />
+
 function PlayButton() {
   const t = useWard((s) => s.t)
   const playing = useWard((s) => s.playing)
@@ -243,9 +274,7 @@ function WingOverview({ day, wing }: { day: Day; wing: Wing }) {
       </section>
 
       <section className="section">
-        <h2 className="h2">
-          {say('Needs attention')} <span className="count num">{alerts.length}</span>
-        </h2>
+        <AttentionHeading alerts={alerts} day={day} t={t} />
         {alerts.length === 0 ? (
           <p className="empty">
             {!live && wing.code === STORY
@@ -256,13 +285,15 @@ function WingOverview({ day, wing }: { day: Day; wing: Wing }) {
               : say('Nothing is flagged here at {time}.', { time: clock(t) })}
           </p>
         ) : (
-          <ul className="alerts">
-            {alerts.map((a) => (
-              <AlertRow key={a.id} alert={a} day={day} t={t} onPick={() => select(a.target)} />
-            ))}
-          </ul>
+          <Suspense fallback={<Holding n={alerts.length} />}>
+            <AlertList alerts={alerts} day={day} t={t} onPick={select} />
+          </Suspense>
         )}
       </section>
+
+      <Suspense fallback={null}>
+        <Ahead day={day} scope={wing.code} />
+      </Suspense>
 
       <section className="section">
         <h2 className="h2">{say('Equipment')}</h2>
@@ -319,24 +350,24 @@ function LevelOverview({ day, level }: { day: Day; level: number }) {
       </section>
 
       <section className="section">
-        <h2 className="h2">
-          {say('Needs attention')} <span className="count num">{alerts.length}</span>
-        </h2>
+        <AttentionHeading alerts={alerts} day={day} t={t} />
         {alerts.length === 0 ? (
           <p className="empty">{say('Nothing is flagged on level {level} at {time}.', { level, time: clock(t) })}</p>
         ) : (
           <>
-            <ul className="alerts">
-              {alerts.slice(0, SHOWN).map((a) => (
-                <AlertRow key={a.id} alert={a} day={day} t={t} onPick={() => select(a.target)} named />
-              ))}
-            </ul>
+            <Suspense fallback={<Holding n={alerts.length} />}>
+              <AlertList alerts={alerts.slice(0, SHOWN)} day={day} t={t} onPick={select} named />
+            </Suspense>
             {alerts.length > SHOWN && (
               <p className="small">{say('The worst {shown} of {all}. Each wing lists all of its own.', { shown: SHOWN, all: alerts.length })}</p>
             )}
           </>
         )}
       </section>
+
+      <Suspense fallback={null}>
+        <Ahead day={day} scope={levelScope(level)} />
+      </Suspense>
 
       <section className="section">
         <h2 className="h2">{say('Equipment')}</h2>
@@ -397,24 +428,24 @@ function HospitalOverview({ day }: { day: Day }) {
       </section>
 
       <section className="section">
-        <h2 className="h2">
-          {say('Needs attention')} <span className="count num">{alerts.length}</span>
-        </h2>
+        <AttentionHeading alerts={alerts} day={day} t={t} />
         {alerts.length === 0 ? (
           <p className="empty">{say('Nothing is flagged anywhere at {time}.', { time: clock(t) })}</p>
         ) : (
           <>
-            <ul className="alerts">
-              {alerts.slice(0, SHOWN).map((a) => (
-                <AlertRow key={a.id} alert={a} day={day} t={t} onPick={() => select(a.target)} named />
-              ))}
-            </ul>
+            <Suspense fallback={<Holding n={alerts.length} />}>
+              <AlertList alerts={alerts.slice(0, SHOWN)} day={day} t={t} onPick={select} named />
+            </Suspense>
             {alerts.length > SHOWN && (
               <p className="small">{say('The worst {shown} of {all}. Each wing lists all of its own.', { shown: SHOWN, all: alerts.length })}</p>
             )}
           </>
         )}
       </section>
+
+      <Suspense fallback={null}>
+        <Ahead day={day} scope={HOSPITAL} />
+      </Suspense>
 
       <section className="section">
         <h2 className="h2">{say('Equipment')}</h2>
@@ -471,29 +502,6 @@ function LiveIntro() {
       )}
     </>
   )
-}
-
-function AlertRow({ alert, day, t, onPick, named }: { alert: Alert; day: Day; t: number; onPick?: () => void; named?: boolean }) {
-  const severity = severityAt(alert, day, t)
-  const Icon = SEV_ICON[severity]
-  // Across the hospital, name the wing; the story wing's support rooms and equipment keep short ids that do not.
-  const wing = alertWing(alert)
-  const where = named && wing && !alert.target.id.includes(wing) ? `${alert.target.id} · ${wing}` : alert.target.id
-  const body = (
-    <>
-      <Icon className="alert__icon" size={16} strokeWidth={2} style={{ color: SEVERITY[severity] }} aria-label={say(severity)} />
-      <span className="alert__body">
-        <span className="alert__title">
-          {alertTitle(alert)} <span className="alert__where num">{where}</span>
-        </span>
-        <span className="alert__detail">{describe(alert, day, t)}</span>
-      </span>
-      <span className="alert__age num" aria-label={say('flagged at {time}', { time: clock(alert.from) })}>
-        {clock(alert.from)}
-      </span>
-    </>
-  )
-  return <li>{onPick ? <button className="alert" onClick={onPick}>{body}</button> : <div className="alert alert--static">{body}</div>}</li>
 }
 
 const KINDS: AssetKind[] = ['pump', 'vent', 'chair', 'xray', 'scanner']
@@ -604,6 +612,9 @@ function RoomDetail({ day, id }: { day: Day; id: string }) {
               </span>
             </p>
             {bed.note && <p className="note">{say(bed.note)}.</p>}
+            <Suspense fallback={null}>
+              <RoomPlan day={day} t={t} room={id} />
+            </Suspense>
             <StateStrip
               t={t}
               label={say('Bed states through the day: {states}', {
@@ -625,11 +636,9 @@ function RoomDetail({ day, id }: { day: Day; id: string }) {
           </>
         )}
         {alerts.length > 0 && (
-          <ul className="alerts alerts--tight">
-            {alerts.map((a) => (
-              <AlertRow key={a.id} alert={a} day={day} t={t} />
-            ))}
-          </ul>
+          <Suspense fallback={<Holding n={alerts.length} />}>
+            <AlertList alerts={alerts} day={day} t={t} />
+          </Suspense>
         )}
       </section>
 
@@ -697,6 +706,10 @@ function RoomDetail({ day, id }: { day: Day; id: string }) {
       </section>
 
       {isBed && <Nearest room={room} />}
+
+      <Suspense fallback={null}>
+        <AlertHistory day={day} t={t} target={{ type: 'room', id }} />
+      </Suspense>
     </>
   )
 }
@@ -789,11 +802,9 @@ function AssetDetail({ day, id }: { day: Day; id: string }) {
           .
         </p>
         {alerts.length > 0 && (
-          <ul className="alerts alerts--tight">
-            {alerts.map((a) => (
-              <AlertRow key={a.id} alert={a} day={day} t={t} />
-            ))}
-          </ul>
+          <Suspense fallback={<Holding n={alerts.length} />}>
+            <AlertList alerts={alerts} day={day} t={t} />
+          </Suspense>
         )}
       </section>
 
@@ -824,6 +835,10 @@ function AssetDetail({ day, id }: { day: Day; id: string }) {
           ))}
         </ol>
       </section>
+
+      <Suspense fallback={null}>
+        <AlertHistory day={day} t={t} target={{ type: 'asset', id }} />
+      </Suspense>
     </>
   )
 }

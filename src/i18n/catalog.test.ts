@@ -2,6 +2,7 @@ import ts from 'typescript'
 import { describe, expect, it } from 'vitest'
 import { WINGS, isBed } from '../data/floorplan'
 import { ALERT_TITLE } from '../lib/alerts'
+import { TEAM_LABEL } from '../lib/handling'
 import { ASSET_LABEL, ASSET_STATUS_LABEL, BED_LABEL } from '../lib/query'
 import { simulate } from '../sim/simulate'
 import arabic from './ar'
@@ -51,6 +52,7 @@ function keysInData() {
     ...Object.values(ASSET_LABEL),
     ...Object.values(ASSET_STATUS_LABEL),
     ...Object.values(ALERT_TITLE),
+    ...Object.values(TEAM_LABEL),
     ...WINGS[0].rooms.filter((r) => !isBed(r)).map((r) => r.name),
     ...Object.values(day.rooms).flatMap((r) => r.spans.map((s) => s.note).filter((n): n is string => !!n)),
     'critical',

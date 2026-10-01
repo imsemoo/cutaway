@@ -86,6 +86,25 @@ A `<cutaway-twin>` web component and a postMessage API, so a host dashboard can 
 - Alerts announced in a live region.
 - axe-core checks in CI.
 
+## Phase 4: operations
+
+What makes it a tool an operator could work in, not only watch.
+
+### 4.1 Alert handling
+- Acknowledge an alert, then send it to the team that owns it: nursing, housekeeping, facilities or bed management. Each alert keeps a log: opened, acknowledged, sent, cleared.
+- Clearing stays with the data. An alert clears when its condition ends, as alarm-management standards (ISA-18.2) have it; an operator acknowledges, and cannot close a warm room with a button.
+- Actions are part of the day, stamped with the minute they were taken, so scrubbing back before an acknowledgement shows the alert new again.
+- Live: actions travel over the feed. The server logs them as events, so every screen on the feed sees them and a reconnect catches up; an action taken offline waits in an outbox and is sent once, by its id, when the connection is back.
+- The embed reports each alert's handling.
+- **Done when:** an alert can be acknowledged and sent from the panel, its log reads back at any minute without showing what comes later, an action taken during the demo's outage arrives after it, and a host page hears the handling.
+
+### 4.2 A capacity forecast
+- How many ward beds will be free over the next four hours, net of the patients waiting for one, with a range meant to hold four times in five.
+- Made only from what is known at the minute: beds being turned over, discharges planned at the morning round, patients waiting, and the usual rate of admissions. Never from the simulated future.
+- The simulation gains what a hospital would know: discharge plans and bed requests, drawn from a stream of their own so the replayed day stays as it was.
+- A backtest makes the forecast at every half hour of the day in every wing and measures how often the range held and how far its middle was off.
+- **Done when:** every overview shows the next four hours, the backtest runs in the unit tests, and the README and the making-of quote its numbers.
+
 ## Status
 
 - [x] 1.1 Tests and CI: 23 unit tests, 8 browser tests at two sizes, lint, types and a bundle budget, all gating the deploy, green on GitHub.
@@ -100,3 +119,5 @@ A `<cutaway-twin>` web component and a postMessage API, so a host dashboard can 
 - [x] 3.2 Architecture notes: an architecture page, nine decision records, and a making-of with the numbers before and after each change
 - [x] 3.3 Embed API: `<cutaway-twin>` in a 1 kB `embed.js`, a postMessage protocol in the link's own words, origin-locked after a handshake; a demo host page at /host/; docs/embed.md and decision 10
 - [x] 3.4 Accessibility: the model as one keyboard widget (arrow keys by screen direction, Enter, Escape, each move said aloud), alerts said as they open, axe-core checks of eight views at two sizes in CI; decision 11. Not yet tried with a daily screen-reader user
+- [x] 4.1 Alert handling: acknowledge, then send to the owning team, with a log in each room that reads back at any minute and says when an alert cleared unseen; actions through the feed with an outbox that survives the demo's outage, logged once by id; `acknowledged` and `sentTo` in the embed's alerts; decision 12
+- [x] 4.2 A capacity forecast: ward beds four hours ahead in every overview, as a likely value and a range, from plans, requests and turnover the simulation now records, identical when built from the live feed; the backtest holds the range 93.6 % of the time per wing four hours ahead and 80.0 % for the hospital over twelve other days, `npm run backtest`; decision 13

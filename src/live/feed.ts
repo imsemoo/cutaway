@@ -1,3 +1,4 @@
+import type { AlertAction } from '../data/types'
 import type { ClientMessage, ServerMessage, Stamped } from './protocol'
 
 /*
@@ -7,7 +8,15 @@ import type { ClientMessage, ServerMessage, Stamped } from './protocol'
   one all end in a subscribe that asks only for what was missed.
   Reconnects back off exponentially, with jitter, so a ward full of
   screens does not come back in step after an outage.
+
+  What an operator does goes the other way, through an outbox: an action
+  waits there until the server's log has it, and goes again after every
+  reconnect. The server logs an action once, by its id, so sending it
+  twice is safe.
 */
+
+/** An action on its way: the server stamps the minute. */
+export type Outgoing = Omit<AlertAction, 'at'>
 
 /**
   How the feed reaches a server: a WebSocket in production, the mock
@@ -27,6 +36,15 @@ export interface FeedHandlers {
   /** Events to fold in order; with `reset`, the day starts over from them. `at` is the server's clock. */
   apply(events: Stamped[], reset: boolean, at: number): void
   status(s: FeedStatus): void
+  /** The actions the server's log does not have yet, whenever that changes. */
+  pending?(actions: Outgoing[]): void
+}
+
+export interface Feed {
+  /** Sends an action now if the feed is up, and otherwise once it is back. */
+  act(action: Outgoing): void
+  /** Closes the feed for good. */
+  close(): void
 }
 
 export const RETRY = { base: 500, cap: 15_000 }
@@ -39,8 +57,8 @@ export function backoff(attempt: number, random = Math.random) {
   return d / 2 + (random() * d) / 2
 }
 
-/** Opens the feed; the function it returns closes it for good. */
-export function openFeed(transport: Transport, on: FeedHandlers, frame: (flush: () => void) => void = requestAnimationFrame) {
+/** Opens the feed. */
+export function openFeed(transport: Transport, on: FeedHandlers, frame: (flush: () => void) => void = requestAnimationFrame): Feed {
   let day: number | undefined
   let last = -1
   let attempt = 0
@@ -76,6 +94,20 @@ export function openFeed(transport: Transport, on: FeedHandlers, frame: (flush: 
     link?.send(JSON.stringify(m))
   }
 
+  // Actions the server's log does not have yet, in the order they were taken.
+  const outbox = new Map<string, Outgoing>()
+  const report = () => on.pending?.([...outbox.values()])
+  const post = (action: Outgoing) => {
+    if (day === undefined || syncing || !link) return
+    const m: ClientMessage = { type: 'act', day, action }
+    link.send(JSON.stringify(m))
+  }
+  const logged = (events: Stamped[]) => {
+    let heard = false
+    for (const e of events) if (e.kind === 'alert-action') heard = outbox.delete(e.action.id) || heard
+    if (heard) report()
+  }
+
   const listen = () => {
     clearTimeout(silence)
     silence = setTimeout(drop, SILENCE)
@@ -89,18 +121,26 @@ export function openFeed(transport: Transport, on: FeedHandlers, frame: (flush: 
         queue = []
         reset = true
       }
+      // An action belongs to the day it was taken on: on a new day its alert is another one.
+      if (day !== undefined && m.day !== day && outbox.size) {
+        outbox.clear()
+        report()
+      }
       day = m.day
       queue.push(...m.events)
       last = m.events.at(-1)?.seq ?? (m.reset ? -1 : last)
       clock = m.at
       attempt = 0
       on.status({ state: 'live', caughtUp: m.reset ? undefined : m.events.length })
+      logged(m.events)
+      outbox.forEach(post)
     } else if (syncing) {
       return // anything sent before the server answered is in its answer
     } else if (m.type === 'event') {
       if (m.day !== day || m.event.seq !== last + 1) return subscribe()
       last = m.event.seq
       queue.push(m.event)
+      logged([m.event])
     } else {
       if (m.day !== day || m.seq !== last) return subscribe()
       clock = m.at
@@ -145,11 +185,18 @@ export function openFeed(transport: Transport, on: FeedHandlers, frame: (flush: 
   }
 
   dial()
-  return () => {
-    stopped = true
-    clearTimeout(retry)
-    hangUp()
-    on.status({ state: 'closed' })
+  return {
+    act: (action) => {
+      outbox.set(action.id, action)
+      report()
+      post(action)
+    },
+    close: () => {
+      stopped = true
+      clearTimeout(retry)
+      hangUp()
+      on.status({ state: 'closed' })
+    },
   }
 }
 

@@ -1,4 +1,4 @@
-import type { Alert, AssetKind, AssetStatus, BedState } from '../data/types'
+import type { Alert, AlertAction, AssetKind, AssetStatus, BedState } from '../data/types'
 
 /*
   The live feed's wire protocol: JSON text frames. The mock server in
@@ -15,12 +15,21 @@ export type WardEvent =
   | { kind: 'call'; room: string; pressed: number; on: boolean }
   | { kind: 'alert-open'; alert: Omit<Alert, 'to'> }
   | { kind: 'alert-close'; id: string }
+  /** A patient needs a ward bed (`waiting`), or has been given one (`room`). */
+  | { kind: 'bed-request'; id: string; wing: string; waiting: boolean; room?: string }
+  /** The morning round expects a patient to go home today, at about `eta`. */
+  | { kind: 'discharge-plan'; room: string; eta: number }
+  /** An operator acknowledged an alert or sent it to a team, on some screen; the server stamps the minute. */
+  | { kind: 'alert-action'; action: Omit<AlertAction, 'at'> }
 
 /** An event in the day's log: `seq` counts from 0 each day, `at` is the simulated minute. */
 export type Stamped = WardEvent & { seq: number; at: number }
 
-/** Asks for the stream. With the last day and seq it has, a client gets only what it missed. */
-export type ClientMessage = { type: 'subscribe'; day?: number; after?: number }
+export type ClientMessage =
+  /** Asks for the stream. With the last day and seq it has, a client gets only what it missed. */
+  | { type: 'subscribe'; day?: number; after?: number }
+  /** Something an operator did, on the day it was done. The server logs it once, by its id, and sends it to every screen. */
+  | { type: 'act'; day: number; action: Omit<AlertAction, 'at'> }
 
 export type ServerMessage =
   /** The answer to subscribe: the missed events, or with `reset` the whole day so far. */

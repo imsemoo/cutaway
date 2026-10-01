@@ -134,6 +134,64 @@ test('live mode streams the day, and catches up after the server goes down', asy
   await expect(page).not.toHaveURL(/mode=live/)
 })
 
+test('live, an action goes through the server, and one taken while it is down waits for it', async ({ page }) => {
+  await page.goto('/?mode=live')
+  const status = page.locator('.feed [role="status"]')
+  await expect(status).toHaveText('Live')
+  // The warm room's alert stays open for hours of the feed's minutes, longer than this test.
+  const warm = page.locator('.alert-item', { has: page.locator('.alert__where', { hasText: '4A09' }) })
+  await warm.getByRole('button', { name: /^Acknowledge/ }).click()
+  await expect(warm.locator('.handle')).toContainText(/^Acknowledged \d\d:\d\d/)
+
+  await page.getByRole('button', { name: 'Take the server down for 4 seconds' }).click()
+  await expect(status).toContainText('Offline')
+  await warm.getByRole('button', { name: /^Send to Facilities/ }).click()
+  await expect(warm.locator('.handle')).toHaveText('Waiting for the connection to send')
+  await expect(warm.locator('.handle')).toContainText(/With Facilities since \d\d:\d\d/, { timeout: 20_000 })
+  await expect(status).toContainText('replayed')
+})
+
+test('an alert is acknowledged and sent to its team, and before that minute it is new again', async ({ page }) => {
+  await page.goto('/')
+  const warm = page.locator('.alert-item', { hasText: 'Room too warm' })
+  await warm.getByRole('button', { name: /^Acknowledge/ }).click()
+  await expect(warm.locator('.handle')).toContainText('Acknowledged 14:30')
+  await expect(page.getByRole('heading', { name: /Needs attention/ })).toContainText('3 new')
+  // The button pressed is gone, so focus moves on to the next step, then to where the alert stands.
+  await expect(warm.getByRole('button', { name: /^Send to Facilities/ })).toBeFocused()
+  await page.keyboard.press('Enter')
+  await expect(warm.locator('.handle')).toHaveText('Acknowledged 14:30 · With Facilities since 14:30')
+  await expect(warm.locator('.handle')).toBeFocused()
+
+  // Five minutes back, nobody had acknowledged it yet; forward again, the actions are there.
+  const time = page.getByRole('slider', { name: 'Time of day' })
+  await time.focus()
+  await page.keyboard.press('ArrowLeft')
+  await expect(page.locator('.clock')).toHaveText('14:25')
+  await expect(warm.getByRole('button', { name: /^Acknowledge/ })).toBeVisible()
+  await page.keyboard.press('ArrowRight')
+  await expect(warm.locator('.handle')).toContainText('With Facilities since 14:30')
+
+  // The room keeps the alert's log.
+  await warm.locator('.alert').click()
+  await expect(page.locator('.title')).toContainText('4A09')
+  const log = page.locator('section', { has: page.getByRole('heading', { name: 'Alerts today' }) })
+  await expect(log).toContainText('Acknowledged, 20 min after it opened')
+  await expect(log).toContainText('Sent to Facilities')
+})
+
+test('every overview forecasts its ward beds four hours ahead, as a range', async ({ page }) => {
+  for (const [path, scope] of [['/', 'a wing'], ['/?at=level-4', 'a level'], ['/?at=hospital', 'the hospital']]) {
+    await page.goto(path)
+    const ahead = page.locator('section', { has: page.getByRole('heading', { name: 'Ward beds, the next four hours' }) })
+    await expect(ahead.locator('.verdict'), scope).toHaveText(/^By 18:30: (most likely )?(\d+ beds? to spare|no bed to spare|\d+ patients? without a bed)/)
+    await expect(ahead.getByRole('img'), scope).toHaveAccessibleName(/^By 18:30/)
+  }
+  // A room whose patient the morning round expects to go home says when, until they have gone.
+  await page.goto('/?select=4A10&t=10:00')
+  await expect(page.getByText('Expected to go home at about 10:50, as the morning round noted at 08:20.')).toBeVisible()
+})
+
 test('the whole hospital: six levels, and any wing one click away', async ({ page }) => {
   await page.goto('/')
   await expect(page.locator('.alert')).toHaveCount(4)

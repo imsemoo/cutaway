@@ -9,7 +9,8 @@ import type { Stamped, WardEvent } from './protocol'
   minute. applyEvents is the page's side: it folds events into the same Day
   the views already read, so no view needs to know where its day came from.
   Anything still going on (a bed's current state, a call light that is on,
-  an open alert) ends at Infinity until an event closes it.
+  an open alert, a patient waiting for a bed) ends at Infinity until an
+  event closes it.
 */
 
 export function toEvents(day: Day): Stamped[] {
@@ -46,6 +47,12 @@ export function toEvents(day: Day): Stamped[] {
     add(alert.from, { kind: 'alert-open', alert: { ...alert, severity } })
     add(to, { kind: 'alert-close', id: alert.id })
   }
+  for (const r of day.requests) {
+    add(r.at, { kind: 'bed-request', id: r.id, wing: r.wing, waiting: true })
+    add(r.admitted, { kind: 'bed-request', id: r.id, wing: r.wing, waiting: false, room: r.room })
+  }
+  for (const p of day.plans) add(p.at, { kind: 'discharge-plan', room: p.room, eta: p.eta })
+  for (const { at, ...action } of day.actions) add(at, { kind: 'alert-action', action })
   // Array sort is stable, so the order above holds within each minute.
   return log.sort((a, b) => a.at - b.at).map((e, seq) => ({ ...e, seq }))
 }
@@ -53,7 +60,7 @@ export function toEvents(day: Day): Stamped[] {
 export function emptyDay(seed: number): Day {
   const rooms: Record<string, RoomDay> = {}
   for (const r of ROOMS) rooms[r.id] = { spans: [], temp: [], co2: [] }
-  return { seed, rooms, calls: [], assets: [], alerts: [] }
+  return { seed, rooms, calls: [], assets: [], alerts: [], requests: [], plans: [], actions: [] }
 }
 
 /**
@@ -67,6 +74,9 @@ export function applyEvents(day: Day, events: Stamped[]): Day {
   const assets = [...day.assets]
   const calls = [...day.calls]
   const alerts = [...day.alerts]
+  const requests = [...day.requests]
+  const plans = [...day.plans]
+  const actions = [...day.actions]
   const fresh = new Set<unknown[]>()
   const own = <T,>(list: T[]): T[] => {
     if (fresh.has(list)) return list
@@ -114,6 +124,8 @@ export function applyEvents(day: Day, events: Stamped[]): Day {
   const callKey = (c: { room: string; at: number }) => `${c.room}|${c.at}`
   let callIndex: Map<string, number> | undefined
   let alertIndex: Map<string, number> | undefined
+  let requestIndex: Map<string, number> | undefined
+  let actionIds: Set<string> | undefined
 
   const end = <T extends { to: number }>(list: T[], at: number) => {
     const last = list[list.length - 1]
@@ -175,7 +187,25 @@ export function applyEvents(day: Day, events: Stamped[]): Day {
         if (i !== undefined) alerts[i] = { ...alerts[i], to: e.at }
         break
       }
+      case 'bed-request':
+        if (e.waiting) {
+          requests.push({ id: e.id, wing: e.wing, at: e.at, admitted: Infinity })
+          if (requestIndex && !requestIndex.has(e.id)) requestIndex.set(e.id, requests.length - 1)
+        } else {
+          const i = (requestIndex ??= firstIndex(requests, (r) => r.id)).get(e.id)
+          if (i !== undefined) requests[i] = { ...requests[i], admitted: e.at, room: e.room }
+        }
+        break
+      case 'discharge-plan':
+        plans.push({ room: e.room, at: e.at, eta: e.eta })
+        break
+      case 'alert-action':
+        // A server logs an action once; a screen that hears it twice still counts it once.
+        if ((actionIds ??= new Set(actions.map((a) => a.id))).has(e.action.id)) break
+        actionIds.add(e.action.id)
+        actions.push({ ...e.action, at: e.at })
+        break
     }
   }
-  return { seed: day.seed, rooms, calls, assets, alerts }
+  return { seed: day.seed, rooms, calls, assets, alerts, requests, plans, actions }
 }

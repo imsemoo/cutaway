@@ -1,6 +1,6 @@
 # The making of Cutaway
 
-Cutaway began as one hospital floor and grew into six levels of six wings, a live feed, wayfinding, a heatmap that had to be rebuilt, and an Arabic interface. This is how, with the numbers measured before and after each change. Frame rates are from one laptop, an integrated Intel UHD GPU at 1280 × 800 and a pixel ratio of 1.25, orbiting at the top quality level; its own load moves them by up to 16 fps between runs, so each is given as the range of three.
+Cutaway began as one hospital floor and grew into six levels of six wings, a live feed, wayfinding, a heatmap that had to be rebuilt, an Arabic interface, and alerts and a forecast an operator can work with. This is how, with the numbers measured before and after each change. Frame rates are from one laptop, an integrated Intel UHD GPU at 1280 × 800 and a pixel ratio of 1.25, orbiting at the top quality level; its own load moves them by up to 16 fps between runs, so each is given as the range of three.
 
 ## From one floor to a hospital
 
@@ -64,6 +64,22 @@ The model became one keyboard stop that takes the arrow keys ([decision 11](deci
 ## A new name
 
 It was called Ward Twin, a plain description of the first version: a digital twin of one hospital ward. By the time it held six levels of six wings the name described a fraction of it. A cutaway is the architect's drawing that removes part of a building's shell to show what is inside, which is what the plan view's section cut and the levels drawn apart already did, so the project took that name in October 2026. In Arabic it is مقطع, the same drawing's name.
+
+## Alerts someone can answer
+
+Until October the panel listed alerts and nothing could be done about them. Now an operator acknowledges one and sends it to the team that owns it, and each alert keeps a log: opened, acknowledged, sent, cleared ([decision 12](decisions/0012-operators-acknowledge-the-data-clears.md)). Clearing stayed with the data, as alarm standards keep it, so the log can say what an alarm review looks for: "Cleared after 1 min, never acknowledged".
+
+Live, the action travels over the feed and comes back as an event, so every screen sees the same thing. The demo's outage button is the test: an alert sent to facilities while the server is down shows "Waiting for the connection to send" and arrives once the server is back, logged once however many times it was sent. A browser test does exactly that.
+
+The alert list and the forecast below load after the first paint, which held the first load to 90.8 kB of its 91.
+
+## A forecast the backtest corrected
+
+The overviews now forecast the next four hours of ward beds as a range ([decision 13](decisions/0013-a-forecast-checked-against-the-day.md)). The first version looked plausible on screen. The backtest, which makes the forecast every half hour from 06:00 in every wing and compares it with what the day did four hours later, said it held its range 50% of the time where it aimed for 80%, and missed by 5.2 beds on average.
+
+Two faults explained it. The draw of how many patients arrive returned −1, not 0, outside admission hours, so every quiet step counted a bed that did not exist; fixing it took the range to 88.5% and the miss to under a bed. The second was a blind spot: before the morning round has written its plans, the forecast saw almost no one going home. At 08:00 it put the whole hospital at nine patients short of beds by noon, and noon came with 19 beds to spare. It now expects the discharges the round has yet to plan from the usual day, and says 21, with a range of 12 to 30. On the same window, the range now holds 91.8% of the time and misses by 0.96 of a bed. A forecast of the whole hospital takes 2.8 ms.
+
+One day is a thin test for the hospital as a whole, so the unit tests also run it over twelve other simulated days, where it holds 80% of the time four hours ahead, as it aims to. `npm run backtest` prints both tables.
 
 ## Not measured yet
 

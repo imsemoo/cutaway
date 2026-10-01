@@ -53,7 +53,7 @@ Every event bubbles, and carries its data in `detail`.
 | `twin-alert` | `{ alert }` | An alert opened while the clock ran forward, playing or live. |
 | `twin-error` | `{ key, message }` | A setting the twin could not take. The rest of that command was applied. |
 
-An alert is `{ id, kind, severity, title, text, target, where, wing, since, opened }`; `since` is when what it is about began, the call pressed or the bed vacated, and `opened` when the alert opened. `title`, `text` and `where` are worded in the twin's language, as its own panel words them; `kind` and `severity` are stable codes for a host that words alerts itself. `target.id` is what `set({ select })` takes to show it.
+An alert is `{ id, kind, severity, title, text, target, where, wing, since, opened, acknowledged, sentTo }`; `since` is when what it is about began, the call pressed or the bed vacated, and `opened` when the alert opened. `acknowledged` is when an operator acknowledged it, `"HH:MM"`, and `sentTo` the team it was sent to (`nursing`, `housekeeping`, `facilities` or `bed-management`); each is `null` until it happens. `title`, `text` and `where` are worded in the twin's language, as its own panel words them; `kind` and `severity` are stable codes for a host that words alerts itself. `target.id` is what `set({ select })` takes to show it.
 
 ```js
 const twin = document.querySelector('cutaway-twin')
@@ -94,6 +94,7 @@ Wait for `ready` before sending `connect`. The twin's listener loads with the pa
 ## What it does and does not let a host do
 
 - A host can do what a link can, and no more. Every value is checked the way a link's is; one that fails comes back as an `error` and changes nothing.
+- A host hears how each alert is handled but cannot acknowledge or send one: those are an operator's actions, taken in the twin.
 - The twin listens only to its own parent window, and after `connect`, only to that origin; a `connect` from any other origin is ignored. It posts its state and alerts only to that origin, never to `*`; `ready` is the one message posted to any origin, and it carries nothing.
 - A page with an opaque origin, such as one opened from a file, cannot connect, since the twin could not answer it without answering everyone. Serve the host page over HTTP.
 - The demo accepts any host. A deployment names its hosts when it builds: `VITE_EMBED_ORIGINS=https://ops.example.org npm run build`, and every other origin is ignored. It should also send a `Content-Security-Policy: frame-ancestors` header, so no other site can frame the twin at all; GitHub Pages cannot set headers, which is why the demo does not.
@@ -103,12 +104,14 @@ Wait for `ready` before sending `connect`. The twin's listener loads with the pa
 - While the replay plays or live mode runs, the clock alone is reported at most once a second. A time the host sets is reported at once, and any other change straight away.
 - A host's `set` is applied whole and reported once.
 - `twin-alert` fires only while the clock runs forward, playing or live, for alerts that open within the step. A jump or a scrub sends the new list as `twin-alerts`, and no `twin-alert` for what was skipped.
-- `alerts` is sent again when the list, a severity or the language changes. Each alert's `text` is worded as of that moment.
+- `alerts` is sent again when the list, a severity, how an alert is handled, or the language changes. Each alert's `text` is worded as of that moment.
 - In live mode the feed owns the time, so `t` and `playing` come back as errors.
 
 ## Changes
 
 Adding a message or a field keeps the name `cutaway/1`. A change that would break an existing host gets a new name.
+
+- October 2026: alerts carry `acknowledged` and `sentTo`.
 
 ## Trying it locally
 

@@ -76,6 +76,42 @@ export interface Alert {
   since: number
 }
 
+/** The team an alert is sent to. */
+export type Team = 'nursing' | 'housekeeping' | 'facilities' | 'bed-management'
+
+/** Something an operator did about an alert, at a minute of the day. */
+export interface AlertAction {
+  /** Unique, so an action sent twice over a feed is counted once. */
+  id: string
+  alert: string
+  act: 'ack' | 'send'
+  at: number
+  /** Who it was sent to, for `send`. */
+  team?: Team
+  /** The screen it came from, on a live feed; none in replay, where it is the person at this one. */
+  by?: string
+}
+
+/** A patient who needs a ward bed: from ED, theatre or another ward. */
+export interface BedRequest {
+  id: string
+  wing: string
+  at: number
+  /** When the patient got a bed; Infinity while they wait (live). */
+  admitted: number
+  /** The bed they got, once they have. */
+  room?: string
+}
+
+/** A discharge expected today, as the morning board round noted it. */
+export interface DischargePlan {
+  room: string
+  /** When it was noted. */
+  at: number
+  /** When the patient is expected to leave. Plans slip: it is an estimate. */
+  eta: number
+}
+
 export interface RoomDay {
   spans: BedSpan[]
   /** Samples every 5 minutes, 289 values from 00:00 to 24:00. */
@@ -89,6 +125,9 @@ export interface Day {
   calls: CallEvent[]
   assets: Asset[]
   alerts: Alert[]
+  requests: BedRequest[]
+  plans: DischargePlan[]
+  actions: AlertAction[]
 }
 
 export type Layer = 'beds' | 'temp' | 'air' | 'calls'

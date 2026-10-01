@@ -1,4 +1,4 @@
-import type { AlertKind, Layer, Severity, View } from '../data/types'
+import type { AlertKind, Layer, Severity, Team, View } from '../data/types'
 import type { Lang } from '../i18n'
 import type { Mode } from '../state/store'
 
@@ -60,6 +60,10 @@ export interface TwinAlert {
   since: string
   /** When the alert opened, "HH:MM". */
   opened: string
+  /** When an operator acknowledged it, "HH:MM", or null while no one has. */
+  acknowledged: string | null
+  /** The team it was sent to, or null while it has not been. */
+  sentTo: Team | null
 }
 
 export type HostMessage = { type: 'connect' } | ({ type: 'set' } & Settings)

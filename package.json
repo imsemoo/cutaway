@@ -11,6 +11,7 @@
     "lint": "eslint . --max-warnings 0",
     "test": "vitest run",
     "test:e2e": "playwright test",
+    "backtest": "vitest run src/lib/forecast.test.ts --mode backtest --reporter=verbose",
     "budget": "node scripts/budget.mjs",
     "check": "npm run typecheck && npm run lint && npm test && npm run build && npm run budget",
     "models": "node tools/models/build.mjs",

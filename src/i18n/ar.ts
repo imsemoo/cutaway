@@ -171,6 +171,51 @@ export default {
   'Clean since {at}, no patient assigned for {wait}.': 'نظيف منذ {at}، ولم يُخصَّص لمريض منذ {wait}.',
   '{v} % and in use. Plug it into mains.': '{v}% وقيد الاستخدام. وصّلها بالكهرباء.',
 
+  // Handling alerts
+  Acknowledge: 'استلام',
+  'Acknowledge: {alert}': 'استلام: {alert}',
+  'Acknowledged {time}': 'استُلم {time}',
+  'Acknowledged {time} on another screen': 'استُلم {time} من شاشة أخرى',
+  'Send to {team}': 'أرسل إلى {team}',
+  'Send to {team}: {alert}': 'أرسل إلى {team}: {alert}',
+  'With {team} since {time}': 'لدى {team} منذ {time}',
+  'Sending…': 'جارٍ الإرسال…',
+  'Waiting for the connection to send': 'بانتظار الاتصال للإرسال',
+  Nursing: 'التمريض',
+  Housekeeping: 'خدمات النظافة',
+  Facilities: 'الصيانة',
+  'Bed management': 'إدارة الأسرّة',
+  'Alerts today': 'تنبيهات اليوم',
+  Opened: 'فُتح',
+  'Acknowledged, {wait} after it opened': 'استُلم بعد {wait} من فتحه',
+  'Acknowledged on another screen, {wait} after it opened': 'استُلم من شاشة أخرى بعد {wait} من فتحه',
+  'Sent to {team}': 'أُرسل إلى {team}',
+  'Cleared, after {wait}': 'انتهى بعد {wait}',
+  'Cleared after {wait}, never acknowledged': 'انتهى بعد {wait} دون أن يستلمه أحد',
+  'Not acknowledged yet': 'لم يُستلم بعد',
+
+  // Ward beds ahead
+  'Ward beds, the next four hours': 'أسرّة العنابر في الساعات الأربع القادمة',
+  'Clean and ready now': 'نظيفة وجاهزة الآن',
+  'Patients waiting for a bed': 'مرضى ينتظرون سريرًا',
+  'longest {wait}': 'أطولهم {wait}',
+  'Discharges planned, not gone yet': 'خروج مخطط له لم يتم بعد',
+  'no bed to spare': 'لا سرير فائض',
+  'By {time}: {mid}.': 'بحلول {time}: {mid}.',
+  'By {time}: most likely {mid}, and from {low} to {high} four times in five.': 'بحلول {time}: الأرجح {mid}، وبين {low} و{high} أربع مرات من كل خمس.',
+  'By {time}: most likely {mid}, and from {low} to {high} patients four times in five.':
+    'بحلول {time}: الأرجح {mid}، وبين {low} و{high} من المرضى أربع مرات من كل خمس.',
+  'By {time}: most likely {mid}; four times in five, anywhere from {low} to {high}.': 'بحلول {time}: الأرجح {mid}، وأربع مرات من كل خمس يقع بين {low} و{high}.',
+  'A forecast from the beds being turned over, the discharges planned and the usual pace of admissions, never from later in the day. ICU bays are left out: they admit bay to bay.':
+    'توقّع من الأسرّة الجاري تجهيزها، وحالات الخروج المخطط لها، والوتيرة المعتادة للدخول، ولا شيء مما يأتي لاحقًا في اليوم. غرف العناية المركزة خارجه، فلها دخولها الخاص.',
+  'So far': 'حتى الآن',
+  'Likely range': 'المدى المرجّح',
+  'What the recorded day did': 'ما جرى في اليوم المسجّل',
+  'No bed to spare': 'لا سرير فائض',
+  'Expected to go home at about {eta}, as the morning round noted at {at}.': 'يُتوقَّع خروجه إلى المنزل نحو {eta}، كما سجّلته جولة الصباح الساعة {at}.',
+  'Was expected to go home at about {eta}, as the morning round noted at {at}, and has not gone yet.':
+    'كان يُتوقَّع خروجه إلى المنزل نحو {eta}، كما سجّلته جولة الصباح الساعة {at}، ولم يخرج بعد.',
+
   // Equipment
   Equipment: 'الأجهزة',
   'Infusion pump': 'مضخة محاليل',
@@ -265,6 +310,9 @@ export default {
   '{n} min away': { one: 'دقيقة واحدة سيرًا', two: 'دقيقتان سيرًا', few: '{n} دقائق سيرًا', many: '{n} دقيقة سيرًا', other: '{n} دقيقة سيرًا' },
   '{n} new alerts': { one: 'تنبيه جديد واحد', two: 'تنبيهان جديدان', few: '{n} تنبيهات جديدة', many: '{n} تنبيهًا جديدًا', other: '{n} تنبيه جديد' },
   '{n} alerts': { zero: 'لا تنبيهات', one: 'تنبيه واحد', two: 'تنبيهان', few: '{n} تنبيهات', many: '{n} تنبيهًا', other: '{n} تنبيه' },
+  '{n} new': { one: 'واحد جديد', two: 'اثنان جديدان', few: '{n} جديدة', many: '{n} جديدًا', other: '{n} جديد' },
+  '{n} beds to spare': { one: 'سرير واحد فائض', two: 'سريران فائضان', few: '{n} أسرّة فائضة', many: '{n} سريرًا فائضًا', other: '{n} سرير فائض' },
+  '{n} patients without a bed': { one: 'مريض واحد بلا سرير', two: 'مريضان بلا سرير', few: '{n} مرضى بلا سرير', many: '{n} مريضًا بلا سرير', other: '{n} مريض بلا سرير' },
   '{n} beds': { one: 'سرير واحد', two: 'سريران', few: '{n} أسرّة', many: '{n} سريرًا', other: '{n} سرير' },
   '{n} wings': { one: 'جناح واحد', two: 'جناحان', few: '{n} أجنحة', many: '{n} جناحًا', other: '{n} جناح' },
   '{n} calls so far today, longest wait {wait} min.': {

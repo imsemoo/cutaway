@@ -27,7 +27,9 @@ for (const file of readdirSync(dir).filter((f) => f.endsWith('.js'))) {
 // and query modules with the entry, and the bundler then keeps those in a chunk of their own
 // that still loads first: 90.6 kB, of which 0.2 kB is new code and 0.7 kB chunk overhead.
 // Five ways to keep them in the entry were tried, from bundler settings to handing the
-// bridge its helpers from the app, and none did.
+// bridge its helpers from the app, and none did. The alert actions and the forecast load
+// after the first paint; what stays in it for them, the lazy imports and the feed's outbox
+// in the store, takes it to 90.8 kB.
 const FIRST_LOAD = 91
 const gz = (file) => gzipSync(readFileSync(join(dir, file)), { level: 9 }).length / 1000
 const first = new Set()

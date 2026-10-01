@@ -13,3 +13,5 @@ Short records of the choices that shaped Cutaway: what forced each one, what was
 9. [A budget for every chunk, and for the first load](0009-budgets.md)
 10. [Embed through an iframe, with the link's own words](0010-embed-through-an-iframe.md)
 11. [The model is one keyboard widget](0011-the-model-is-one-keyboard-widget.md)
+12. [Operators acknowledge; the data clears](0012-operators-acknowledge-the-data-clears.md)
+13. [A forecast from what is known, checked against the day](0013-a-forecast-checked-against-the-day.md)

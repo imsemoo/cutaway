@@ -1,6 +1,7 @@
 import type { Alert, Day } from '../data/types'
 import { setLang, useLang } from '../i18n'
 import { alertTitle, describe, severityAt } from '../lib/alerts'
+import { handlingAt } from '../lib/handling'
 import { alertWing, clock } from '../lib/query'
 import { alertPlace, alertWatch } from '../lib/watch'
 import { scopeToParam } from '../state/scope'
@@ -89,7 +90,7 @@ export function bridge() {
     const { day, t } = s
     const { open: now, opened } = watch(s)
     if (day) for (const a of opened) post({ type: 'alert', alert: describeAlert(a, day, t) })
-    const key = useLang.getState().lang + now.map((a) => a.id + (day ? severityAt(a, day, t) : '')).join()
+    const key = useLang.getState().lang + now.map((a) => a.id + (day ? severityAt(a, day, t) + handled(a, day, t) : '')).join()
     if (key === listed) return
     listed = key
     post({ type: 'alerts', alerts: day ? now.map((a) => describeAlert(a, day, t)) : [] })
@@ -140,7 +141,14 @@ export function bridge() {
   }
 }
 
+/** How far an alert has been handled, as a key that changes when that does. */
+function handled(a: Alert, day: Day, t: number) {
+  const { ack, sent } = handlingAt(day, a.id, t)
+  return sent ? 'sent' : ack ? 'ack' : ''
+}
+
 function describeAlert(a: Alert, day: Day, t: number): TwinAlert {
+  const { ack, sent } = handlingAt(day, a.id, t)
   return {
     id: a.id,
     kind: a.kind,
@@ -152,5 +160,7 @@ function describeAlert(a: Alert, day: Day, t: number): TwinAlert {
     wing: alertWing(a) ?? '',
     since: clock(a.since),
     opened: clock(a.from),
+    acknowledged: ack ? clock(ack.at) : null,
+    sentTo: sent?.team ?? null,
   }
 }

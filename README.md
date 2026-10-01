@@ -34,12 +34,14 @@ The full film, 58 seconds, goes on to the way to the nearest free pump, the whol
   - Digits stay Western, like the room numbers (4A09) and clock times they sit beside.
 - **Every view is a link.** The address bar keeps the view, layer, time and selection, so `?view=plan&layer=air&t=18:00&select=FAM` opens the family lounge at its stuffiest hour, `?at=level-4` a whole level and `?at=hospital` the whole hospital.
 - **Alerts that only know the present.** Each alert is worded at the replay minute ("Pressed at 14:21, 9 min without an answer"), so scrubbing never leaks what happens next.
+- **Alerts an operator can answer.** Acknowledge an alert, then send it to the team that owns it: facilities for a warm room, nursing for a call light, housekeeping for a bed waiting to be cleaned, bed management for a clean bed with no patient. Each alert keeps a log in its room: opened, acknowledged and how long after, sent, cleared, or "Cleared after 1 min, never acknowledged". The alert clears when its condition does, not when someone clicks: as in alarm-management standards, acknowledging is the operator's and clearing is the data's. Scrub back before an acknowledgement and the alert is new again. Live, actions go through the server to every screen, and one taken while the server is down waits and arrives after.
+- **The next four hours of ward beds.** Every overview forecasts how many ward beds will be free, net of the patients waiting for one, as a likely value and a range meant to hold four times in five, drawn beside the last four hours and, in replay, what the recorded day went on to do. A room whose patient the morning round expects to go home says when.
 - **By keyboard and screen reader.** The model is one tab stop. The arrow keys move between rooms, or between wings in a level or the whole hospital, by what lies that way on screen; Enter opens one and Escape steps back out. Each move is said aloud ("Patient room 4A09, Occupied"), and so are the alerts that open while the day plays or streams live, a few seconds' worth at a time. The list view carries the same floor as a table, and every view a link opens passes axe's WCAG 2.2 A and AA checks at desktop and phone size on every push.
 - **Inside another page.** A dashboard adds the twin with one script and one tag, `<cutaway-twin at="level-4">`, opens it on any room, layer or minute, and hears what happens in it: what was selected, the alerts open, and each alert as it opens. [A mock operations page](https://imsemoo.github.io/cutaway/host/) shows it; [docs/embed.md](docs/embed.md) is the reference.
 
 ## How it is built
 
-The whole system on one page is in [docs/architecture.md](docs/architecture.md); the reasons behind it, in [eleven short decision records](docs/decisions/README.md); and how it got here, with the numbers measured before and after each change, in [the making of](docs/making-of.md).
+The whole system on one page is in [docs/architecture.md](docs/architecture.md); the reasons behind it, in [thirteen short decision records](docs/decisions/README.md); and how it got here, with the numbers measured before and after each change, in [the making of](docs/making-of.md).
 
 - React 19, TypeScript, React Three Fiber, drei and three.js, bundled with Vite.
 - **The day is generated in a Web Worker** from a fixed seed, so the scene's first frame never waits on the simulation and every visitor replays the same day.
@@ -51,6 +53,12 @@ The whole system on one page is in [docs/architecture.md](docs/architecture.md);
   - Reconnects back off from half a second, doubling to 15 s, at a random point in the upper half of each wait, so screens do not all come back at once.
   - Events are applied at most once a frame, so a catch-up burst costs one render.
   - Building with `VITE_FEED_URL=wss://…` points the same client at a real WebSocket server. The protocol is in [docs/live-feed.md](docs/live-feed.md).
+- **A forecast checked against the day.** The balance of ward beds, clean beds less patients waiting, moves by beds coming out of cleaning and requests arriving, and nothing else: an admission takes one of each.
+  - Each forecast draws 300 times how long the beds being turned over and the discharges the morning round planned will take, and how many requests arrive at the usual pace, seeded by the minute and the place so a view always shows the same one. The whole hospital takes 2.8 ms in Node.
+  - It reads only what is known at the minute. A test builds it from the live feed up to a minute and from the whole recorded day, and they must be identical.
+  - A backtest makes it every half hour in every wing and compares it with what the day did. Four hours ahead the range held 93.6 % of the time and the middle was off by 0.68 of a bed; over twelve other simulated days, the hospital as a whole held 80.0 %. The first version held 50 %, and the backtest found why ([the making of](docs/making-of.md)). `npm run backtest` prints the tables.
+  - The simulation gained the discharge plans and bed requests a hospital would know ahead, from a random stream of its own, so the replayed day stayed as it was.
+- **Actions through the feed.** An operator's action goes to the server as a message and comes back to every screen as an event, so all of them read the same log. It waits in an outbox until the server's log has it and goes again after a reconnect; the server logs it once, by its id.
 - **Wayfinding over a graph of the building.** Nodes stand in every room, at its door, along both corridors of every wing, where the corridors meet through the core, along the glazed links between wings and rows, and at every lift. Costs are seconds: walking at 1.2 m/s, and a lift as a wait plus a few seconds a floor.
   - "Which free pump is nearest?" has many answers to weigh, so one Dijkstra search from the room reaches all of them at once, where A* would need a search per pump. The hospital's graph has 4,296 nodes; it is built once, in under 10 ms, and a search took 2 to 11 ms in Node.
   - The search loads on the first request, as its own 1.4 kB file, so the page does not carry it until someone asks.
@@ -86,7 +94,7 @@ The whole system on one page is in [docs/architecture.md](docs/architecture.md);
   - The twin announces itself, the host connects, and from then on the twin takes commands only from that origin and posts only to it. A build can name the only hosts allowed, with `VITE_EMBED_ORIGINS`.
   - Commands are checked by the same function that reads a link; one it cannot take comes back as an error and changes nothing.
   - The twin's side loads only when it runs in a frame.
-- **Code-split by weight.** What paints the interface loads first: 90.8 kB gzipped, the entry chunk and the three small chunks it imports, which the budget counts together. Live mode and the list view load when someone opens them. The scene and three.js follow (215 kB and 99 kB), then the model loader (20 kB). Ambient occlusion and SMAA load last, and only when the quality level uses them (157 kB, a third of it SMAA's lookup texture). CI enforces a budget for every chunk and for the first load.
+- **Code-split by weight.** What paints the interface loads first: 90.8 kB gzipped, the entry chunk and the three small chunks it imports, which the budget counts together. The alert list and the forecast follow as soon as it has painted, since neither can show anything before the day arrives. Live mode and the list view load when someone opens them. The scene and three.js follow (215 kB and 99 kB), then the model loader (20 kB). Ambient occlusion and SMAA load last, and only when the quality level uses them (157 kB, a third of it SMAA's lookup texture). CI enforces a budget for every chunk and for the first load.
 - **The camera fits the building by projection:** it projects the floor's corners through a trial camera to find the distance and offset that keep the model clear of the overlays, and turns the building lengthwise on tall screens.
 - Reduced motion turns camera flights and the wall animation into cuts.
 
@@ -107,7 +115,7 @@ The on-screen meter (`?stats`) shows the frame rate while moving, draw calls, tr
 
 ## Tests
 
-- `npm test` runs 66 unit tests on the hospital plan, the simulation, the queries, the alert wording, the live feed, the wayfinding, the corridor field, the Arabic catalogue, the embed bridge and the keyboard cursor:
+- `npm test` runs 86 unit tests on the hospital plan, the simulation, the queries, the alert wording and handling, the live feed, the forecast, the wayfinding, the corridor field, the Arabic catalogue, the embed bridge and the keyboard cursor:
   - six levels of six wings, with unique ids, every room inside its wing and no two rooms overlapping;
   - the same seed gives the same day, and every wing a day of its own;
   - more than 3,000 pieces of equipment, each only ever inside its own wing;
@@ -118,12 +126,15 @@ The on-screen meter (`?stats`) shows the frame rate while moving, draw calls, tr
   - the 14:30 story the case study describes still holds;
   - the day rebuilt from the event log, batch by batch, reads exactly like the recording at every five-minute reading, and holds nothing from later in the day;
   - the connection resumes after a drop, asks again after a gap, drops a silent link and backs off with jitter;
+  - an action is sent once the feed is up, held while it is down, sent again after a reconnect unless the log already has it, folded in once however often it arrives, and dropped when the day ends;
+  - how an alert is handled at a minute knows nothing done after it, and its log clears only once its condition does;
+  - the forecast starts from the balance now, is the same from the live feed as from the recording, counts a planned discharge only from when it was noted, and holds its range in the backtest;
   - every room reaches every other; a way follows corridors and links, crosses to the next wing, the other row or another level when it must, and counts a lift ride in time but not in metres;
   - every room has a door on a corridor, and every wing matches the plan room for room, so the shader finds each reading where it looks;
   - the Arabic catalogue covers every string the code says, with the same placeholders and nothing stale, and counts by Arabic's plural rules;
   - the embed bridge talks only to the page that connected, takes what a link takes and refuses the rest by name, reports an alert opening only while the clock runs forward, words alerts in the language on show, and reports the clock alone at most once a second;
   - an arrow key steps to the nearest room that way on screen, keeping to the row, and nowhere when nothing lies within 60 degrees of it.
-- `npm run test:e2e` runs 21 browser tests at desktop and phone size, with real WebGL. They cover shared links, layers, the list view, search, playback, sideways scroll, recovery from a lost WebGL context (also when the effects arrive after the loss), live mode through a server outage, the whole hospital, a level and a wing, the panel opening each new place at its top, the way to the nearest free pump, the Arabic interface (right to left, remembered, and read from a link), the twin embedded in a page on another origin that moves it and hears it, the model driven from the keyboard, and an alert said aloud as it opens. Every test fails on a console error. Then, as a stage of its own, axe-core checks eight views against WCAG 2.2 A and AA at both sizes.
+- `npm run test:e2e` runs 24 browser tests at desktop and phone size, with real WebGL. They cover shared links, layers, the list view, search, playback, sideways scroll, recovery from a lost WebGL context (also when the effects arrive after the loss), live mode through a server outage, an alert acknowledged and sent and new again before that minute, one sent while the live server is down, the forecast in every overview, the whole hospital, a level and a wing, the panel opening each new place at its top, the way to the nearest free pump, the Arabic interface (right to left, remembered, and read from a link), the twin embedded in a page on another origin that moves it and hears it, the model driven from the keyboard, and an alert said aloud as it opens. Every test fails on a console error. Then, as a stage of its own, axe-core checks eight views against WCAG 2.2 A and AA at both sizes.
 - `npm run check` runs types, lint, the unit tests, the build and the bundle budget. CI runs all of it, plus the browser tests, before every deploy; a failing check blocks the deploy.
 
 ## Run it

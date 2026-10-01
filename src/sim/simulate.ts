@@ -1,5 +1,5 @@
 import { STORY, WINGS, type Wing } from '../data/floorplan'
-import type { Alert, Asset, AssetKind, AssetSpan, AssetStatus, BedSpan, CallEvent, Day, RoomDay } from '../data/types'
+import type { Alert, Asset, AssetKind, AssetSpan, AssetStatus, BedRequest, BedSpan, CallEvent, Day, DischargePlan, RoomDay } from '../data/types'
 
 /*
   One simulated day in the hospital, generated from a fixed seed so every
@@ -25,7 +25,8 @@ import { DAY_MIN, SAMPLES, STEP } from './time'
 
 const hm = (h: number, m = 0) => h * 60 + m
 
-function mulberry32(seed: number) {
+/** A small seeded random number generator: the same seed, the same numbers. */
+export function mulberry32(seed: number) {
   let a = seed >>> 0
   return () => {
     a = (a + 0x6d2b79f5) | 0
@@ -54,6 +55,10 @@ export function simulate(seed = SEED, wings: Wing[] = WINGS): Day {
     calls: days.flatMap((d) => d.calls).sort((a, b) => a.at - b.at),
     assets: days.flatMap((d) => d.assets),
     alerts: days.flatMap((d) => d.alerts).sort((a, b) => a.from - b.from),
+    requests: days.flatMap((d) => d.requests).sort((a, b) => a.at - b.at),
+    plans: days.flatMap((d) => d.plans).sort((a, b) => a.at - b.at),
+    // What operators do is added as they do it.
+    actions: [],
   }
 }
 
@@ -62,6 +67,23 @@ const FLEET: Record<'story' | 'wing', [AssetKind, string, number][]> = {
   story: [['pump', 'IVP', 18], ['vent', 'VEN', 4], ['chair', 'WCH', 6], ['xray', 'PXR', 1], ['scanner', 'BSC', 2]],
   wing: [['pump', 'IVP', 58], ['vent', 'VEN', 6], ['chair', 'WCH', 15], ['xray', 'PXR', 2], ['scanner', 'BSC', 4]],
 }
+
+/**
+  An ordinary wing's day, which the story wing departs from: how many patients go home and
+  when, how long a vacated bed waits for cleaning and how long cleaning takes, in minutes,
+  and when admissions arrive. Each wing admits between three fewer patients than it
+  discharged (two at least) and as many. The forecast reads these as the hospital's history.
+*/
+export const WARD = {
+  discharges: [4, 9],
+  leave: [hm(9, 30), hm(15, 30)],
+  wait: [15, 90],
+  clean: [35, 50],
+  arrive: [hm(11), hm(21, 30)],
+} as const
+
+/** How discharges are planned: the share planned ahead, the morning round's hours, and how far an estimate slips, in minutes (late is positive). */
+export const PLAN = { share: 0.85, round: [hm(8), hm(9, 30)], slip: [-20, 70] } as const
 
 function simulateWing(w: Wing, seed: number, story: boolean): Day {
   const rnd = mulberry32(seed)
@@ -117,10 +139,10 @@ function simulateWing(w: Wing, seed: number, story: boolean): Day {
     ]
     admissions = [hm(11, 45), hm(12, 50), hm(13, 40), hm(15, 10), hm(16, 5), hm(17, 20), hm(18, 40), hm(20, 30)]
   } else {
-    discharges = Array.from({ length: randInt(4, 9) }, () => ({ t: randInt(hm(9, 30), hm(15, 30)), wait: randInt(15, 90), clean: randInt(35, 50) })).sort(
+    discharges = Array.from({ length: randInt(...WARD.discharges) }, () => ({ t: randInt(...WARD.leave), wait: randInt(...WARD.wait), clean: randInt(...WARD.clean) })).sort(
       (a, b) => a.t - b.t,
     )
-    admissions = Array.from({ length: randInt(Math.max(2, discharges.length - 3), discharges.length) }, () => randInt(hm(11), hm(21, 30))).sort((a, b) => a - b)
+    admissions = Array.from({ length: randInt(Math.max(2, discharges.length - 3), discharges.length) }, () => randInt(...WARD.arrive)).sort((a, b) => a - b)
     // Now and then a room is closed for repairs all day.
     if (rnd() < 0.3) {
       const id = pool.pop()!
@@ -148,6 +170,26 @@ function simulateWing(w: Wing, seed: number, story: boolean): Day {
   for (const id of pool.slice(discharges.length)) {
     push(id, { from: 0, to: DAY_MIN, state: 'occupied', acuity: generalAcuity() })
   }
+
+  // What the ward knows ahead of time, from a stream of its own, so the day drawn above stays as it was.
+  const ahead = mulberry32(seed ^ 0x2545f491)
+  // Who asked for a ward bed and when they got one: the admissions above, and the three the story arranges for a bed already ready.
+  const asked = admissions.map((t, i) => ({ at: t, admitted: Math.max(t, readyAt[i].at + 10), room: readyAt[i].id }))
+  if (story) for (const [room, at] of [['4A11', hm(8, 20)], ['4B02', hm(9, 10)], ['4A03', hm(11, 25)]] as const) asked.push({ at, admitted: at, room })
+  const requests: BedRequest[] = asked
+    .sort((a, b) => a.at - b.at)
+    .map((r, i) => ({ id: `REQ-${w.code}-${String(i + 1).padStart(2, '0')}`, wing: w.code, ...r }))
+  // Most discharges are planned at the morning board round; the estimate slips, more often late than early.
+  const plans: DischargePlan[] = []
+  discharges.forEach((d, i) => {
+    // Three draws for each, used or not, so one plan never shifts the next.
+    const planned = ahead() < PLAN.share
+    const round = PLAN.round[0] + ahead() * (PLAN.round[1] - PLAN.round[0])
+    const slip = PLAN.slip[0] + ahead() * (PLAN.slip[1] - PLAN.slip[0])
+    if (!planned) return
+    const at = Math.round(Math.min(round, d.t - 30))
+    plans.push({ room: pool[i], at, eta: Math.max(at + STEP, Math.round((d.t - slip) / STEP) * STEP) })
+  })
 
   // ICU: in the story, one step-down transfer and one bed held for an ED admission.
   for (const id of icu) {
@@ -521,5 +563,5 @@ function simulateWing(w: Wing, seed: number, story: boolean): Day {
   }
   alerts.sort((a, b) => a.from - b.from)
 
-  return { seed, rooms, calls, assets, alerts }
+  return { seed, rooms, calls, assets, alerts, requests, plans, actions: [] }
 }

@@ -20,6 +20,12 @@ Text frames, one JSON object each, over any ordered connection. The page's side 
 
 The first asks for the day so far. The second resumes: the page holds day 1 up to event 612 and wants what came after.
 
+```json
+{ "type": "act", "day": 1, "action": { "id": "k3f9qa-1", "alert": "temp-4A09-730", "act": "send", "team": "facilities", "by": "k3f9qa" } }
+```
+
+`act` is something an operator did: `ack` to acknowledge an alert, or `send` to send it to a `team` (nursing, housekeeping, facilities, bed-management). `by` names the screen it came from, and `id` is unique to the action. The server logs it as an `alert-action` event at its own clock and sends it to every subscriber, the screen that sent it included. It logs an action once, by its `id`, and ignores one for another day or for an alert that has not opened; a real server would also say why.
+
 ## Server to page
 
 **`sync`** answers a subscribe.
@@ -55,6 +61,9 @@ The first asks for the day so far. The second resumes: the page holds day 1 up t
 | `call` | `room`, `pressed` (the minute it was pressed), `on` | Nurse call |
 | `alert-open` | `alert`: `id`, `kind`, `from`, `since`, `severity`, `target`, `title` | A rules engine |
 | `alert-close` | `id` | The same |
+| `bed-request` | `id`, `wing`, `waiting`, and `room` once the patient has a bed | Admissions: ED, theatre and transfers asking for a ward bed |
+| `discharge-plan` | `room`, `eta` (the minute the patient is expected to go) | The morning board round |
+| `alert-action` | `action`: `id`, `alert`, `act`, `team`, `by` | Operators, through `act` |
 
 An alert opens with only what is known then. A warm room or an unanswered call opens as a warning, and the page decides when it turns critical from the readings and the minutes waited.
 
@@ -68,13 +77,14 @@ The page:
 - treats four seconds without a frame as a dropped connection;
 - reconnects after a drop, waiting before attempt n for a random time between half and all of min(15 s, 0.5 s × 2ⁿ), so screens do not all come back at once;
 - applies events at most once per animation frame, so a catch-up burst costs one render;
-- shows the connection in the footer, and says on the stage when the floor it shows is no longer live.
+- shows the connection in the footer, and says on the stage when the floor it shows is no longer live;
+- keeps each action in an outbox until an `alert-action` event with its `id` comes back, sends what is still there after every `sync`, and drops it when the server moves to a new day. An action taken while the feed is down waits, and its alert says so.
 
-"Take the server down for 4 seconds" in the demo drops every connection and refuses new ones for four seconds, so all of the above can be watched.
+"Take the server down for 4 seconds" in the demo drops every connection and refuses new ones for four seconds, so all of the above can be watched, an alert acknowledged during the outage included.
 
 ## Plugging in a real source
 
-1. Run a server that speaks this protocol. It keeps each day's events in order with a `seq`, publishes each one as it happens, ticks once a second, and answers subscribe from a buffer of recent events.
+1. Run a server that speaks this protocol. It keeps each day's events in order with a `seq`, publishes each one as it happens, ticks once a second, answers subscribe from a buffer of recent events, and logs each `act` once, as an event, passing it on to the team's own system.
 2. Map each system to events, as in the table above.
 3. Build the page with `VITE_FEED_URL=wss://your-server/ward npm run build`.
 

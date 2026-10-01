@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { STORY, WING_BY_CODE } from '../data/floorplan'
+import { ROOM_BY_ID, STORY, WING_BY_CODE } from '../data/floorplan'
 import type { Day } from '../data/types'
 import { activeAlerts, activeCall, alertWing, assetAt, batteryAt, bedAt, census, sample } from '../lib/query'
 import { simulate } from '../sim/simulate'
@@ -30,6 +30,14 @@ function reading(d: Day, m: number) {
     alerts: activeAlerts(d, m)
       .filter((a) => wings.has(alertWing(a) ?? ''))
       .map((a) => a.id)
+      .sort(),
+    waiting: d.requests
+      .filter((r) => wings.has(r.wing) && r.at <= m && r.admitted > m)
+      .map((r) => r.id)
+      .sort(),
+    plans: d.plans
+      .filter((p) => wings.has(ROOM_BY_ID[p.room].wing) && p.at <= m)
+      .map((p) => `${p.room} ${p.at} ${p.eta}`)
       .sort(),
   }
 }
@@ -70,10 +78,20 @@ describe('the live feed', () => {
       }
       expect(live.calls.every((c) => c.at <= m)).toBe(true)
       expect(live.alerts.every((a) => a.from <= m)).toBe(true)
+      expect(live.requests.every((r) => r.at <= m)).toBe(true)
+      expect(live.plans.every((p) => p.at <= m)).toBe(true)
       // Whatever is still going on ends at Infinity, not at the end the recording knows.
       for (const a of live.alerts) if (a.to > m) expect(a.to, a.id).toBe(Infinity)
       for (const c of live.calls) if (c.at + c.wait > m) expect(c.wait).toBe(Infinity)
+      for (const r of live.requests) if (r.admitted > m) expect(r.admitted, r.id).toBe(Infinity)
     }
+  })
+
+  it('folds an operator action in once, at the minute the server logged it, however often it arrives', () => {
+    const action = { id: 'screen-1', alert: 'temp-4A09-740', act: 'ack', by: 'screen' } as const
+    const heard = { kind: 'alert-action', action, at: 871.5, seq: 0 } as const
+    const live = applyEvents(applyEvents(emptyDay(day.seed), [heard]), [{ ...heard, seq: 1 }])
+    expect(live.actions).toEqual([{ ...action, at: 871.5 }])
   })
 
   it('opens alerts with only what is known then', () => {

@@ -14,16 +14,24 @@ function harness() {
   }
   const applied: { events: number[]; reset: boolean; at: number }[] = []
   const statuses: FeedStatus[] = []
+  const pending: string[][] = []
   const frames: (() => void)[] = []
-  const close = openFeed(
+  const feed = openFeed(
     transport,
-    { apply: (events, reset, at) => applied.push({ events: events.map((e) => e.seq), reset, at }), status: (s) => statuses.push(s) },
+    {
+      apply: (events, reset, at) => applied.push({ events: events.map((e) => e.seq), reset, at }),
+      status: (s) => statuses.push(s),
+      pending: (actions) => pending.push(actions.map((a) => a.id)),
+    },
     (flush) => frames.push(flush),
   )
   const say = (m: ServerMessage) => links.at(-1)!.on.message(JSON.stringify(m))
   const nextFrame = () => frames.splice(0).forEach((f) => f())
-  return { links, applied, statuses, close, say, nextFrame, last: () => links.at(-1)! }
+  return { links, applied, statuses, pending, feed, close: feed.close, say, nextFrame, last: () => links.at(-1)! }
 }
+
+const ack = { id: 'screen-1', alert: 'temp-4A09-740', act: 'ack', by: 'screen' } as const
+const logged = (seq: number): Stamped => ({ seq, at: seq, kind: 'alert-action', action: ack })
 
 beforeEach(() => vi.useFakeTimers())
 afterEach(() => vi.useRealTimers())
@@ -118,6 +126,58 @@ describe('the live feed connection', () => {
     h.say({ type: 'sync', day: 1, reset: true, events: [], at: 0 })
     h.last().on.close()
     expect(h.statuses.at(-1)).toMatchObject({ state: 'retrying', attempt: 1 })
+  })
+
+  it('sends an action at once, and keeps it until the log has it', () => {
+    const h = harness()
+    h.last().on.open()
+    h.say({ type: 'sync', day: 1, reset: true, events: [ev(0)], at: 870 })
+    h.feed.act(ack)
+    expect(h.last().sent.at(-1)).toEqual({ type: 'act', day: 1, action: ack })
+    expect(h.pending.at(-1)).toEqual(['screen-1'])
+    h.say({ type: 'event', day: 1, event: logged(1) })
+    expect(h.pending.at(-1)).toEqual([])
+  })
+
+  it('holds an action taken while the feed is down, and sends it once the feed is back', () => {
+    const h = harness()
+    h.last().on.open()
+    h.say({ type: 'sync', day: 1, reset: true, events: [ev(0)], at: 870 })
+    h.last().on.close()
+    h.feed.act(ack)
+    expect(h.pending.at(-1)).toEqual(['screen-1'])
+    vi.advanceTimersByTime(RETRY.base)
+    h.last().on.open()
+    expect(h.last().sent).toEqual([{ type: 'subscribe', day: 1, after: 0 }])
+    h.say({ type: 'sync', day: 1, reset: false, events: [], at: 875 })
+    expect(h.last().sent.at(-1)).toEqual({ type: 'act', day: 1, action: ack })
+  })
+
+  it('sends again after a reconnect what the log may have missed, but not what it caught up with', () => {
+    const h = harness()
+    h.last().on.open()
+    h.say({ type: 'sync', day: 1, reset: true, events: [ev(0)], at: 870 })
+    h.feed.act(ack)
+    h.last().on.close()
+    vi.advanceTimersByTime(RETRY.base)
+    h.last().on.open()
+    // The server logged it before the line dropped: the catch-up carries it, and nothing is sent twice.
+    h.say({ type: 'sync', day: 1, reset: false, events: [logged(1)], at: 875 })
+    expect(h.last().sent.filter((m) => m.type === 'act')).toEqual([])
+    expect(h.pending.at(-1)).toEqual([])
+  })
+
+  it('drops the actions of a day that has ended', () => {
+    const h = harness()
+    h.last().on.open()
+    h.say({ type: 'sync', day: 1, reset: true, events: [], at: 1439 })
+    h.last().on.close()
+    h.feed.act(ack)
+    vi.advanceTimersByTime(RETRY.base)
+    h.last().on.open()
+    h.say({ type: 'sync', day: 2, reset: true, events: [], at: 0 })
+    expect(h.pending.at(-1)).toEqual([])
+    expect(h.last().sent.filter((m) => m.type === 'act')).toEqual([])
   })
 
   it('stays closed once closed', () => {

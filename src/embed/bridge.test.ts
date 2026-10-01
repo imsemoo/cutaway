@@ -3,6 +3,7 @@ import { STORY, WING_BY_CODE } from '../data/floorplan'
 import { clock } from '../lib/query'
 import { setLang } from '../i18n'
 import { SEED, simulate } from '../sim/simulate'
+import { act } from '../state/act'
 import { useWard } from '../state/store'
 import { bridge } from './bridge'
 import { PROTOCOL, type TwinAlert, type TwinState } from './protocol'
@@ -129,6 +130,20 @@ describe('the embed bridge', () => {
     const arabic = twin.of('alerts').at(-1)?.data.alerts?.find((a) => a.id === alert.id)
     expect(arabic?.title).not.toBe(english?.title)
     expect(arabic?.target).toEqual(english?.target)
+  })
+
+  it('tells the page how each alert is being handled, as it changes', () => {
+    const alert = day.alerts.find((a) => a.kind === 'temp')!
+    useWard.setState({ t: alert.from + 30 })
+    twin = framed()
+    twin.send({ type: 'connect' })
+    const now = () => twin.of('alerts').at(-1)?.data.alerts?.find((a) => a.id === alert.id)
+    expect(now()).toMatchObject({ acknowledged: null, sentTo: null })
+    act(alert.id, 'ack')
+    expect(now()).toMatchObject({ acknowledged: clock(alert.from + 30), sentTo: null })
+    useWard.getState().setT(alert.from + 32)
+    act(alert.id, 'send', 'facilities')
+    expect(now()).toMatchObject({ acknowledged: clock(alert.from + 30), sentTo: 'facilities' })
   })
 
   it('reports the clock alone at most once a second', () => {

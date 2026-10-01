@@ -889,28 +889,57 @@ button {
 .alerts--tight {
   margin-top: 12px;
 }
+/* An alert and, under it, where it stands with the operators. */
+.alert-item {
+  border: 1px solid var(--line);
+  border-radius: var(--r);
+  background: var(--surface);
+  transition: border-color 150ms ease-out;
+}
+.alert-item:has(> button.alert:hover) {
+  border-color: var(--line-2);
+}
 .alert {
   display: grid;
   grid-template-columns: 18px minmax(0, 1fr) auto;
   gap: 10px;
   width: 100%;
-  padding: 10px;
-  border: 1px solid var(--line);
-  border-radius: var(--r);
-  background: var(--surface);
+  padding: 10px 10px 6px;
+  border: 0;
+  border-radius: calc(var(--r) - 1px) calc(var(--r) - 1px) 0 0;
+  background: none;
   text-align: start;
   cursor: pointer;
-  transition: border-color 150ms ease-out, background-color 150ms ease-out;
+  transition: background-color 150ms ease-out;
 }
 .alert:hover {
-  border-color: var(--line-2);
   background: var(--surface-2);
 }
 .alert--static,
 .alert--static:hover {
   cursor: default;
-  background: var(--surface);
-  border-color: var(--line);
+  background: none;
+}
+.handle {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px 10px;
+  min-height: 30px;
+  margin: 0;
+  padding-block: 0 8px;
+  padding-inline: 38px 10px;
+  color: var(--text-2);
+  font-size: 12.5px;
+}
+.handle .btn--small {
+  height: 28px;
+  gap: 6px;
+}
+.count--new {
+  border-color: transparent;
+  background: var(--accent-soft);
+  color: var(--accent-2);
 }
 .alert__icon {
   margin-top: 1px;
@@ -1162,6 +1191,78 @@ button {
   font: 10px var(--mono);
   fill: var(--text-3);
   text-anchor: middle;
+}
+/* The forecast: its likely range as a wash, its middle dashed. */
+.chart--outlook {
+  margin-top: 12px;
+}
+.chart--outlook svg {
+  height: 72px;
+}
+.chart__hours {
+  position: relative;
+  height: 16px;
+  direction: ltr;
+  font: 10px/16px var(--mono);
+  color: var(--text-3);
+}
+.chart__hours span {
+  position: absolute;
+  top: 0;
+}
+.chart__band {
+  fill: var(--accent-soft);
+  stroke: rgb(41 70 199 / 0.35);
+  stroke-width: 1;
+  vector-effect: non-scaling-stroke;
+}
+.chart__mid {
+  fill: none;
+  stroke: var(--accent);
+  stroke-width: 1.5;
+  stroke-dasharray: 3 3;
+  vector-effect: non-scaling-stroke;
+}
+.chart figcaption {
+  margin-top: 4px;
+}
+.keys--chart {
+  margin-top: 6px;
+  font-size: 12px;
+}
+.keys__line {
+  width: 14px;
+  height: 0;
+  border-top: 2px solid var(--text);
+}
+.keys__line--recorded {
+  border-top-color: var(--line-2);
+}
+.keys__line--zero {
+  border-top: 1px dashed var(--crit);
+}
+.keys__swatch--range {
+  background: var(--accent-soft);
+  border-color: rgb(41 70 199 / 0.35);
+}
+.verdict {
+  margin: 8px 0 0;
+  color: var(--text);
+  font-weight: 500;
+}
+
+/* A room's or a pump's alerts today, each with its log. */
+.history {
+  display: grid;
+  gap: 14px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.history__title {
+  display: block;
+  margin-bottom: 2px;
+  font-weight: 500;
 }
 
 .things,

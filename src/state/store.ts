@@ -3,7 +3,7 @@ import { ROOMS, ROOM_BY_ID, STORY, WING_BY_CODE, wingOfAsset } from '../data/flo
 
 const ROOM_COUNT = ROOMS.length
 import type { Day, Layer, Selection, View } from '../data/types'
-import type { FeedStatus } from '../live/feed'
+import type { FeedStatus, Outgoing } from '../live/feed'
 import type { Route } from '../lib/wayfinding'
 import { isWing, scopeFromParam, scopeToParam, type Scope } from './scope'
 
@@ -35,6 +35,12 @@ interface WardState {
   route: Route | null
   hover: string | null
   resetKey: number
+  /** This screen's name on a live feed, so its own actions can be told from another screen's. */
+  screen: string
+  /** Actions the live feed's server has not logged yet. */
+  pending: Outgoing[]
+  /** How the live feed sends an action, while it is open (state/act.ts). */
+  send: ((action: Outgoing) => void) | null
   setDay: (day: Day, ms: number, complete: boolean) => void
   setMode: (mode: Mode) => void
   setFeed: (feed: FeedStatus) => void
@@ -125,7 +131,15 @@ export const useWard = create<WardState>((set) => ({
   route: null,
   hover: null,
   resetKey: 0,
-  setDay: (day, simMs, complete) => set((s) => ({ recorded: day, simMs, ...(s.mode === 'replay' && { day, complete }) })),
+  screen: Math.random().toString(36).slice(2, 8),
+  pending: [],
+  send: null,
+  setDay: (day, simMs, complete) =>
+    set((s) => {
+      // What was done to the opening wing before the rest of the hospital arrived carries over.
+      const kept = s.recorded?.actions.length ? { ...day, actions: s.recorded.actions } : day
+      return { recorded: kept, simMs, ...(s.mode === 'replay' && { day: kept, complete }) }
+    }),
   setMode: (mode) =>
     set((s) => {
       if (mode === s.mode) return {}
