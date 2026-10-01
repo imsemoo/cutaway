@@ -1,0 +1,13 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64">
+  <defs>
+    <clipPath id="floor"><path d="M32 22 52 32 32 42 12 32Z"/></clipPath>
+  </defs>
+  <rect width="64" height="64" rx="14" fill="#111827"/>
+  <path d="M32 37 52 47 32 57 12 47Z" fill="#111827" stroke="#e8ecf0" stroke-width="3" stroke-linejoin="round"/>
+  <path d="M12 32v5l20 10v-5Z" fill="#e8ecf0" stroke="#e8ecf0" stroke-width="3" stroke-linejoin="round"/>
+  <path d="M52 32v5L32 47v-5Z" fill="#3d63ff" stroke="#3d63ff" stroke-width="3" stroke-linejoin="round"/>
+  <path d="M32 22 52 32 32 42 12 32Z" fill="#111827"/>
+  <path clip-path="url(#floor)" d="M18.7 35.3 38.7 25.3M25.3 38.7 45.3 28.7M18.7 28.7 38.7 38.7M25.3 25.3 45.3 35.3" stroke="#e8ecf0" stroke-width="1.6" fill="none"/>
+  <path d="M32 22 52 32 32 42 12 32Z" fill="none" stroke="#e8ecf0" stroke-width="3" stroke-linejoin="round"/>
+  <path d="M32 7 52 17 32 27 12 17Z" fill="#111827" stroke="#e8ecf0" stroke-width="3" stroke-linejoin="round"/>
+</svg>

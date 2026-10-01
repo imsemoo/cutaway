@@ -1,3 +1,5 @@
+<img src="public/logo.svg" alt="" width="56" height="56">
+
 # Cutaway
 
 [![Check and deploy](https://github.com/imsemoo/cutaway/actions/workflows/deploy.yml/badge.svg)](https://github.com/imsemoo/cutaway/actions/workflows/deploy.yml)

@@ -30,12 +30,8 @@ export function TopBar() {
   return (
     <header className="bar">
       <div className="brand">
-        <svg className="brand__mark" viewBox="0 0 32 32" aria-hidden="true">
-          <rect width="32" height="32" rx="7" fill="#111827" />
-          <rect x="6" y="7" width="20" height="18" rx="1.5" fill="none" stroke="#e8ecf0" strokeWidth="2" />
-          <path d="M6 14h20M16 14v11" stroke="#e8ecf0" strokeWidth="2" />
-          <rect x="17.5" y="15.5" width="7" height="8" fill="#3d63ff" />
-        </svg>
+        {/* The mark, public/logo.svg: three floors drawn apart, the middle one cut open, its section in blue. A file, not inline, so it stays out of the first load. */}
+        <img className="brand__mark" src="./logo.svg" alt="" width="28" height="28" />
         <div className="brand__text">
           <span className="brand__name">{say('Cutaway')}</span>
           <span className="brand__where">{where}</span>
