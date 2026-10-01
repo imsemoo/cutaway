@@ -1,10 +1,10 @@
 import { PROTOCOL, type Envelope, type HostMessage, type Settings, type TwinAlert, type TwinMessage, type TwinState } from './protocol'
 
 /*
-  <ward-twin>: the twin for a host page, built on its own into embed.js.
+  <cutaway-twin>: the twin for a host page, built on its own into embed.js.
 
-    <script src="https://imsemoo.github.io/ward-twin/embed.js" defer></script>
-    <ward-twin at="level-4" layer="temp" style="height: 40rem"></ward-twin>
+    <script src="https://imsemoo.github.io/cutaway/embed.js" defer></script>
+    <cutaway-twin at="level-4" layer="temp" style="height: 40rem"></cutaway-twin>
 
   The attributes a link takes open the twin where they say, and move it when
   they change; set() changes several at once. Events report what the twin does:
@@ -16,7 +16,7 @@ const SETTINGS = ['at', 'select', 'view', 'layer', 't', 'mode', 'lang'] as const
 // The twin lives beside this script unless the element's src says otherwise.
 const HERE = (document.currentScript as HTMLScriptElement | null)?.src ?? location.href
 
-class WardTwin extends HTMLElement {
+class CutawayTwin extends HTMLElement {
   static observedAttributes = [...SETTINGS, 'src']
   #frame: HTMLIFrameElement | null = null
   #origin = ''
@@ -51,7 +51,7 @@ class WardTwin extends HTMLElement {
     }
     this.#origin = url.origin
     this.#frame = document.createElement('iframe')
-    this.#frame.title = this.getAttribute('title') ?? 'Ward Twin, a 3D digital twin of a hospital: a concept with simulated data'
+    this.#frame.title = this.getAttribute('title') ?? 'Cutaway, a 3D digital twin of a hospital: a concept with simulated data'
     this.#frame.allow = 'fullscreen'
     this.#frame.src = url.href
     window.addEventListener('message', this.#receive)
@@ -114,11 +114,11 @@ class WardTwin extends HTMLElement {
         this.#emit('twin-alert', { alert: m.alert })
         break
       case 'error':
-        console.warn(`<ward-twin> ${m.key}: ${m.message}`)
+        console.warn(`<cutaway-twin> ${m.key}: ${m.message}`)
         this.#emit('twin-error', { key: m.key, message: m.message })
         break
     }
   }
 }
 
-if (!customElements.get('ward-twin')) customElements.define('ward-twin', WardTwin)
+if (!customElements.get('cutaway-twin')) customElements.define('cutaway-twin', CutawayTwin)

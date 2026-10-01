@@ -1,16 +1,18 @@
-# Ward Twin
+# Cutaway
 
-[![Check and deploy](https://github.com/imsemoo/ward-twin/actions/workflows/deploy.yml/badge.svg)](https://github.com/imsemoo/ward-twin/actions/workflows/deploy.yml)
+[![Check and deploy](https://github.com/imsemoo/cutaway/actions/workflows/deploy.yml/badge.svg)](https://github.com/imsemoo/cutaway/actions/workflows/deploy.yml)
 
 A concept digital twin of a hospital, in the browser: six levels of six wings, with 1,368 rooms, 1,008 beds and 3,006 tracked pieces of equipment. It opens on one wing, two wards and an ICU on level 4, and replays a simulated day, or follows it live from a streaming feed: beds turning over from occupied to cleaning to ready, rooms warming up through HVAC faults, call lights waiting too long at shift change, and equipment moving between rooms.
 
 Everything on screen is simulated. There is no real hospital, patient or reading behind it.
 
-![The opening shot and the four layers](film/ward-twin-loop.webp)
+Cutaway was called Ward Twin until October 2026, when it had long outgrown one ward. The old address forwards here.
 
-The full film, 58 seconds, goes on to the way to the nearest free pump, the whole hospital and a level, the interface in Arabic, and the twin inside another page that opens a room in it and hears its alerts: [film/ward-twin-720.mp4](film/ward-twin-720.mp4), captured frame by frame on a controlled clock by `tools/film`.
+![The opening shot and the four layers](film/cutaway-loop.webp)
 
-**Live:** https://imsemoo.github.io/ward-twin/ (add `?stats` for a frame meter, or open [live mode](https://imsemoo.github.io/ward-twin/?mode=live) or [the Arabic interface](https://imsemoo.github.io/ward-twin/?lang=ar), or see it [inside another page](https://imsemoo.github.io/ward-twin/host/))
+The full film, 58 seconds, goes on to the way to the nearest free pump, the whole hospital and a level, the interface in Arabic, and the twin inside another page that opens a room in it and hears its alerts: [film/cutaway-720.mp4](film/cutaway-720.mp4), captured frame by frame on a controlled clock by `tools/film`.
+
+**Live:** https://imsemoo.github.io/cutaway/ (add `?stats` for a frame meter, or open [live mode](https://imsemoo.github.io/cutaway/?mode=live) or [the Arabic interface](https://imsemoo.github.io/cutaway/?lang=ar), or see it [inside another page](https://imsemoo.github.io/cutaway/host/))
 
 ## What it does
 
@@ -31,7 +33,7 @@ The full film, 58 seconds, goes on to the way to the nearest free pump, the whol
 - **Every view is a link.** The address bar keeps the view, layer, time and selection, so `?view=plan&layer=air&t=18:00&select=FAM` opens the family lounge at its stuffiest hour, `?at=level-4` a whole level and `?at=hospital` the whole hospital.
 - **Alerts that only know the present.** Each alert is worded at the replay minute ("Pressed at 14:21, 9 min without an answer"), so scrubbing never leaks what happens next.
 - **By keyboard and screen reader.** The model is one tab stop. The arrow keys move between rooms, or between wings in a level or the whole hospital, by what lies that way on screen; Enter opens one and Escape steps back out. Each move is said aloud ("Patient room 4A09, Occupied"), and so are the alerts that open while the day plays or streams live, a few seconds' worth at a time. The list view carries the same floor as a table, and every view a link opens passes axe's WCAG 2.2 A and AA checks at desktop and phone size on every push.
-- **Inside another page.** A dashboard adds the twin with one script and one tag, `<ward-twin at="level-4">`, opens it on any room, layer or minute, and hears what happens in it: what was selected, the alerts open, and each alert as it opens. [A mock operations page](https://imsemoo.github.io/ward-twin/host/) shows it; [docs/embed.md](docs/embed.md) is the reference.
+- **Inside another page.** A dashboard adds the twin with one script and one tag, `<cutaway-twin at="level-4">`, opens it on any room, layer or minute, and hears what happens in it: what was selected, the alerts open, and each alert as it opens. [A mock operations page](https://imsemoo.github.io/cutaway/host/) shows it; [docs/embed.md](docs/embed.md) is the reference.
 
 ## How it is built
 
@@ -78,7 +80,7 @@ The whole system on one page is in [docs/architecture.md](docs/architecture.md);
   - Counts go through `Intl.PluralRules`, which gives Arabic its six forms. Placeholders are named, so each language puts the number where its grammar wants it.
   - The floor labels are troika text in Vazirmatn, which shapes and joins Arabic in WebGL.
   - A test parses the source with the TypeScript compiler, collects every string passed to `say()` and `plural()`, and fails if the catalogue misses one, drops a placeholder or keeps a string the interface no longer says.
-- **An embed kit.** `embed.js`, 1 kB gzipped, defines `<ward-twin>`, which runs the twin in an iframe and speaks a small `postMessage` protocol with it, in the words a link already uses: `at`, `select`, `layer`, `t`.
+- **An embed kit.** `embed.js`, 1 kB gzipped, defines `<cutaway-twin>`, which runs the twin in an iframe and speaks a small `postMessage` protocol with it, in the words a link already uses: `at`, `select`, `layer`, `t`.
   - The twin announces itself, the host connects, and from then on the twin takes commands only from that origin and posts only to it. A build can name the only hosts allowed, with `VITE_EMBED_ORIGINS`.
   - Commands are checked by the same function that reads a link; one it cannot take comes back as an error and changes nothing.
   - The twin's side loads only when it runs in a frame.

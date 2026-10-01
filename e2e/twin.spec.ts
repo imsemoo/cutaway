@@ -235,7 +235,7 @@ test('an Arabic link opens in Arabic, with readings, times and room numbers inta
 const HOST = 'https://host.test/'
 const hostPage = (twin: string) => `<!doctype html>
 <script src="${twin}embed.js" defer></script>
-<ward-twin at="4a" style="height: 640px"></ward-twin>
+<cutaway-twin at="4a" style="height: 640px"></cutaway-twin>
 <script>
   window.heard = []
   for (const type of ['twin-ready', 'twin-select', 'twin-alerts', 'twin-alert', 'twin-error'])
@@ -249,12 +249,12 @@ test('a page on another origin moves the embedded twin and hears what happens in
   await page.route(HOST, (route) => route.fulfill({ contentType: 'text/html', body: hostPage(baseURL!) }))
   await page.goto(HOST)
   const heard = (type: string) => page.evaluate((t) => (window as unknown as { heard: Heard[] }).heard.filter((h) => h.type === t), type)
-  const twin = page.frameLocator('ward-twin iframe')
+  const twin = page.frameLocator('cutaway-twin iframe')
   await expect(twin.getByRole('heading', { name: /Beds at\s+14:30/ })).toBeVisible()
   await expect.poll(() => heard('twin-ready')).toHaveLength(1)
 
   // The host sets what a link sets.
-  await page.evaluate(() => (document.querySelector('ward-twin') as HTMLElement & { set: (s: object) => void }).set({ select: '4A09', layer: 'temp' }))
+  await page.evaluate(() => (document.querySelector('cutaway-twin') as HTMLElement & { set: (s: object) => void }).set({ select: '4A09', layer: 'temp' }))
   await expect(twin.locator('.title')).toContainText('4A09')
   await expect(twin.getByRole('radio', { name: 'Temperature' })).toHaveAttribute('aria-checked', 'true')
 
@@ -268,18 +268,18 @@ test('a page on another origin moves the embedded twin and hears what happens in
   const [listed] = (await heard('twin-alerts')).slice(-1)
   expect(listed.alerts?.length).toBeGreaterThan(0)
   expect(listed.alerts?.[0]).toMatchObject({ title: expect.any(String), target: { id: expect.any(String) } })
-  await page.evaluate(() => (document.querySelector('ward-twin') as HTMLElement & { set: (s: object) => void }).set({ playing: true }))
+  await page.evaluate(() => (document.querySelector('cutaway-twin') as HTMLElement & { set: (s: object) => void }).set({ playing: true }))
   await expect.poll(async () => (await heard('twin-alert')).length, { timeout: 15_000 }).toBeGreaterThan(0)
 
   // A setting the twin cannot take comes back as an error, and nothing else changes.
-  await page.evaluate(() => (document.querySelector('ward-twin') as HTMLElement & { set: (s: object) => void }).set({ playing: false, layer: 'heat' }))
+  await page.evaluate(() => (document.querySelector('cutaway-twin') as HTMLElement & { set: (s: object) => void }).set({ playing: false, layer: 'heat' }))
   await expect.poll(async () => (await heard('twin-error')).map((h) => h.key)).toEqual(['layer'])
   await expect(twin.getByRole('radio', { name: 'Temperature' })).toHaveAttribute('aria-checked', 'true')
 })
 
 test('the demo host page drives the twin from its own controls', async ({ page }) => {
   await page.goto('/host/')
-  const twin = page.frameLocator('ward-twin iframe')
+  const twin = page.frameLocator('cutaway-twin iframe')
   await expect(page.locator('#now-at')).toHaveText('Wing 4A')
   await expect(page.locator('#alerts li').first()).toBeVisible()
   await page.getByRole('button', { name: 'Level 4' }).click()

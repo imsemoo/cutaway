@@ -1,6 +1,6 @@
 # Roadmap
 
-Ward Twin is a concept, and it stays labelled as one. This roadmap is for the next stage: from a convincing demo to work that holds up when a technical lead opens the demo, reads the code and checks the numbers.
+Cutaway is a concept, and it stays labelled as one. This roadmap is for the next stage: from a convincing demo to work that holds up when a technical lead opens the demo, reads the code and checks the numbers.
 
 ## Principles
 
@@ -79,7 +79,7 @@ An architecture page and short decision records, plus a "making of" write-up wit
 - Built: docs/architecture.md with a diagram of the data flow and a map of what loads when, nine decision records, and docs/making-of.md.
 
 ### 3.3 Embed API
-A `<ward-twin>` web component and a postMessage API, so a host dashboard can select rooms and listen to alerts.
+A `<cutaway-twin>` web component and a postMessage API, so a host dashboard can select rooms and listen to alerts.
 
 ### 3.4 Accessibility
 - Keyboard navigation between rooms in the 3D view.
@@ -98,5 +98,5 @@ A `<ward-twin>` web component and a postMessage API, so a host dashboard can sel
 - [x] 2.4 Sensor heatmaps in a shader: corridors estimated in the fragment shader from the rooms' doors, with isolines and the alert limit; rooms keep their own readings
 - [x] 3.1 Arabic, right to left: the whole interface, the alerts and the floor labels, mirrored where Arabic reads that way; the first load stays at 90 kB
 - [x] 3.2 Architecture notes: an architecture page, nine decision records, and a making-of with the numbers before and after each change
-- [x] 3.3 Embed API: `<ward-twin>` in a 1 kB `embed.js`, a postMessage protocol in the link's own words, origin-locked after a handshake; a demo host page at /host/; docs/embed.md and decision 10
+- [x] 3.3 Embed API: `<cutaway-twin>` in a 1 kB `embed.js`, a postMessage protocol in the link's own words, origin-locked after a handshake; a demo host page at /host/; docs/embed.md and decision 10
 - [x] 3.4 Accessibility: the model as one keyboard widget (arrow keys by screen direction, Enter, Escape, each move said aloud), alerts said as they open, axe-core checks of eight views at two sizes in CI; decision 11. Not yet tried with a daily screen-reader user

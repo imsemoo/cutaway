@@ -10,7 +10,8 @@ import type { Catalog } from '.'
 */
 export default {
   // The page
-  'Ward Twin: a 3D digital twin of a hospital': 'Ward Twin: توأم رقمي ثلاثي الأبعاد لمستشفى',
+  Cutaway: 'مقطع',
+  'Cutaway: a 3D digital twin of a hospital': 'مقطع: توأم رقمي ثلاثي الأبعاد لمستشفى',
   'Skip to details': 'انتقل إلى التفاصيل',
   'Floor model': 'نموذج الطابق',
   '3D model of the hospital': 'النموذج الثلاثي الأبعاد للمستشفى',

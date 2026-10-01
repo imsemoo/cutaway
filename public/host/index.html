@@ -3,8 +3,8 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>Ward Twin inside a host page</title>
-  <meta name="description" content="A mock operations page that embeds Ward Twin with the ward-twin element: it moves the twin and hears its alerts. A concept with simulated data.">
+  <title>Cutaway inside a host page</title>
+  <meta name="description" content="A mock operations page that embeds Cutaway with the cutaway-twin element: it moves the twin and hears its alerts. A concept with simulated data.">
   <link rel="icon" href="../favicon.svg">
   <!-- The whole integration: this script, then the element where the twin goes. -->
   <script src="../embed.js" defer></script>
@@ -34,12 +34,12 @@
     code { font-family: var(--mono); font-size: .92em; }
 
     .layout { display: grid; grid-template-columns: 1fr; }
-    ward-twin { height: 78svh; min-height: 480px; background: #e8ecf0; }
+    cutaway-twin { height: 78svh; min-height: 480px; background: #e8ecf0; }
     .side { min-width: 0; padding: 4px 16px 24px; }
     @media (min-width: 960px) {
       body { height: 100svh; display: grid; grid-template-rows: auto 1fr; }
       .layout { grid-template-columns: 21rem 1fr; min-height: 0; }
-      ward-twin { order: 2; height: 100%; min-height: 0; }
+      cutaway-twin { order: 2; height: 100%; min-height: 0; }
       .side { order: 1; overflow-y: auto; border-inline-end: 1px solid var(--ink-line); }
     }
 
@@ -93,10 +93,10 @@
 <body>
   <header class="bar">
     <strong>Ward operations</strong>
-    <p>A mock host page. Ward Twin runs inside it through <code>&lt;ward-twin&gt;</code>; both are a concept with simulated data. <a href="https://github.com/imsemoo/ward-twin/blob/main/docs/embed.md">How the embed works</a></p>
+    <p>A mock host page. Cutaway runs inside it through <code>&lt;cutaway-twin&gt;</code>; both are a concept with simulated data. <a href="https://github.com/imsemoo/cutaway/blob/main/docs/embed.md">How the embed works</a></p>
   </header>
   <main class="layout">
-    <ward-twin id="twin" at="4a"></ward-twin>
+    <cutaway-twin id="twin" at="4a"></cutaway-twin>
     <div class="side">
       <section aria-labelledby="show-h">
         <h2 id="show-h">Show in the twin</h2>
@@ -238,7 +238,7 @@
 
     // The raw messages from the twin, for anyone reading how it talks.
     window.addEventListener('message', (e) => {
-      if (e.data?.protocol === 'ward-twin/1' && e.data.type !== 'alerts') log('←', e.data)
+      if (e.data?.protocol === 'cutaway/1' && e.data.type !== 'alerts') log('←', e.data)
     })
     function log(arrow, message) {
       const { protocol, type, ...rest } = message

@@ -1,5 +1,5 @@
 /*
-  Ward Twin: an architect's white model with data poured onto the floors.
+  Cutaway: an architect's white model with data poured onto the floors.
   Cool drafting greys, one blue-line accent for selection and actions,
   status colours only where a bed or a reading needs them.
 */
@@ -1675,6 +1675,7 @@ button {
 }
 /* Letter spacing breaks the joins of Arabic script. */
 :lang(ar) .h2,
-:lang(ar) .title {
+:lang(ar) .title,
+:lang(ar) .brand__name {
   letter-spacing: 0;
 }

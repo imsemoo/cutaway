@@ -1,6 +1,6 @@
-# The making of Ward Twin
+# The making of Cutaway
 
-Ward Twin began as one hospital floor and grew into six levels of six wings, a live feed, wayfinding, a heatmap that had to be rebuilt, and an Arabic interface. This is how, with the numbers measured before and after each change. Frame rates are from one laptop, an integrated Intel UHD GPU at 1280 × 800 and a pixel ratio of 1.25, orbiting at the top quality level; its own load moves them by up to 16 fps between runs, so each is given as the range of three.
+Cutaway began as one hospital floor and grew into six levels of six wings, a live feed, wayfinding, a heatmap that had to be rebuilt, and an Arabic interface. This is how, with the numbers measured before and after each change. Frame rates are from one laptop, an integrated Intel UHD GPU at 1280 × 800 and a pixel ratio of 1.25, orbiting at the top quality level; its own load moves them by up to 16 fps between runs, so each is given as the range of three.
 
 ## From one floor to a hospital
 
@@ -47,7 +47,7 @@ The Arabic face was chosen by setting the interface's own text in six faces besi
 
 ## An embed, and the kilobyte it cost
 
-A dashboard can now put the twin inside itself with one tag, `<ward-twin>`, which frames the twin and talks to it in messages ([decision 10](decisions/0010-embed-through-an-iframe.md)). The twin's side of that conversation loads only when the page runs in a frame, so it should have cost an ordinary visit nothing. The budget said otherwise: the first load went from 89.7 to 90.6 kB, over its 90 kB limit. The bridge shares the language and query modules with the entry, and once it imported them too, the bundler moved them into a small chunk of their own, which the entry loads at once. Of the 0.9 kB, 0.2 kB was code; the rest was the cost of a separate file.
+A dashboard can now put the twin inside itself with one tag, `<cutaway-twin>`, which frames the twin and talks to it in messages ([decision 10](decisions/0010-embed-through-an-iframe.md)). The twin's side of that conversation loads only when the page runs in a frame, so it should have cost an ordinary visit nothing. The budget said otherwise: the first load went from 89.7 to 90.6 kB, over its 90 kB limit. The bridge shares the language and query modules with the entry, and once it imported them too, the bundler moved them into a small chunk of their own, which the entry loads at once. Of the 0.9 kB, 0.2 kB was code; the rest was the cost of a separate file.
 
 Five ways around it were measured: two bundler settings, a hand-made React chunk, loading the bridge from the entry file, and handing the bridge its helpers from the app so it imported nothing shared. None got under 90.2 kB. The budget went to 91 kB, with the reason in the script, which is the rule the budget set for itself.
 
@@ -60,6 +60,10 @@ The embed's first push failed CI in a test that had passed on every push before 
 ## Accessible, and checked
 
 The model became one keyboard stop that takes the arrow keys ([decision 11](decisions/0011-the-model-is-one-keyboard-widget.md)), and axe-core now checks eight views at two sizes on every push. Its first run found a single violation, repeated on every view: the canvas's container had a label and no role. Adding the checks also showed something about the tests themselves. Run beside the live-mode test, their weight starved its pages, which render WebGL on the CPU, until the feed's four-second silence check dropped every link; with this change set aside, the same crowding failed the same way. The checks now run as a stage of their own, after the rest.
+
+## A new name
+
+It was called Ward Twin, a plain description of the first version: a digital twin of one hospital ward. By the time it held six levels of six wings the name described a fraction of it. A cutaway is the architect's drawing that removes part of a building's shell to show what is inside, which is what the plan view's section cut and the levels drawn apart already did, so the project took that name in October 2026. In Arabic it is مقطع, the same drawing's name.
 
 ## Not measured yet
 

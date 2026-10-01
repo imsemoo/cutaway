@@ -42,7 +42,7 @@ const heavy = firstKb > FIRST_LOAD
 failed ||= heavy
 console.log(`${heavy ? 'OVER' : 'ok  '}  first load ${firstKb.toFixed(1).padStart(6)} kB / ${FIRST_LOAD} kB (${[...first].map((f) => f.split('-')[0]).join(' + ')})`)
 
-// The <ward-twin> element that host pages load, built on its own beside the app.
+// The <cutaway-twin> element that host pages load, built on its own beside the app.
 const EMBED = 3
 const embedKb = gzipSync(readFileSync('dist/embed.js'), { level: 9 }).length / 1000
 failed ||= embedKb > EMBED

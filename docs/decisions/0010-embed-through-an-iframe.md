@@ -8,7 +8,7 @@ There were three ways to put it there. The twin could ship as a React component 
 
 ## Decision
 
-An iframe, driven by a small `postMessage` protocol, wrapped in a 1 kB custom element, `<ward-twin>`, so a host writes one tag and listens for events. The protocol is in [embed.md](../embed.md).
+An iframe, driven by a small `postMessage` protocol, wrapped in a 1 kB custom element, `<cutaway-twin>`, so a host writes one tag and listens for events. The protocol is in [embed.md](../embed.md).
 
 The twin brings React 19, three.js, its fonts and styles, a Web Worker and a WebGL context. Inside the host's document they would meet the host's own framework, its versions and its CSS, and an error in the twin could take the host down with it. In a frame they stay apart; the twin deploys on its own schedule; and when the two are on different origins, neither can read the other's page. The frame is a boundary, not just a box.
 

@@ -17,7 +17,7 @@ export type Forms = Partial<Record<Intl.LDMLPluralRule, string>> & { other: stri
 export type Catalog = Record<string, string | Forms>
 type Vars = Record<string, string | number>
 
-const KEY = 'ward-twin:lang'
+const KEY = 'cutaway:lang'
 const forms = new Intl.PluralRules('ar')
 let catalog: Catalog | undefined
 
@@ -58,7 +58,7 @@ export async function setLang(lang: Lang) {
   const root = document.documentElement
   root.lang = lang
   root.dir = lang === 'ar' ? 'rtl' : 'ltr'
-  document.title = say('Ward Twin: a 3D digital twin of a hospital')
+  document.title = say('Cutaway: a 3D digital twin of a hospital')
   const q = new URLSearchParams(location.search)
   if (lang === 'ar') q.set('lang', 'ar')
   else q.delete('lang')

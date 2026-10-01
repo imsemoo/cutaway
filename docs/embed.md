@@ -1,18 +1,18 @@
-# Embedding Ward Twin
+# Embedding Cutaway
 
 Another page can put the twin inside itself, move it, and hear what happens in it. A dashboard can open a room from its own list, switch the layer, play the day, and show the twin's alerts in its own interface.
 
-**Demo:** [a mock operations page](https://imsemoo.github.io/ward-twin/host/) that does all of that. Its source is [`public/host/index.html`](../public/host/index.html), plain HTML and script with nothing to build. Like the twin, it is a concept with simulated data.
+**Demo:** [a mock operations page](https://imsemoo.github.io/cutaway/host/) that does all of that. Its source is [`public/host/index.html`](../public/host/index.html), plain HTML and script with nothing to build. Like the twin, it is a concept with simulated data.
 
 ## The element
 
 ```html
-<script src="https://imsemoo.github.io/ward-twin/embed.js" defer></script>
+<script src="https://imsemoo.github.io/cutaway/embed.js" defer></script>
 
-<ward-twin at="level-4" layer="temp" style="height: 40rem"></ward-twin>
+<cutaway-twin at="level-4" layer="temp" style="height: 40rem"></cutaway-twin>
 ```
 
-`embed.js` is 1 kB gzipped and has no dependencies. It defines `<ward-twin>`, which runs the twin in an iframe inside it, so the twin's React, three.js, fonts, styles and WebGL context stay its own and cannot clash with the host's ([decision 10](decisions/0010-embed-through-an-iframe.md)).
+`embed.js` is 1 kB gzipped and has no dependencies. It defines `<cutaway-twin>`, which runs the twin in an iframe inside it, so the twin's React, three.js, fonts, styles and WebGL context stay its own and cannot clash with the host's ([decision 10](decisions/0010-embed-through-an-iframe.md)).
 
 The element finds the twin in the folder the script came from. For a copy hosted elsewhere, point `src` at it. Load the script as a classic script, as above, since that is how it reads its own address.
 
@@ -56,7 +56,7 @@ Every event bubbles, and carries its data in `detail`.
 An alert is `{ id, kind, severity, title, text, target, where, wing, since, opened }`; `since` is when what it is about began, the call pressed or the bed vacated, and `opened` when the alert opened. `title`, `text` and `where` are worded in the twin's language, as its own panel words them; `kind` and `severity` are stable codes for a host that words alerts itself. `target.id` is what `set({ select })` takes to show it.
 
 ```js
-const twin = document.querySelector('ward-twin')
+const twin = document.querySelector('cutaway-twin')
 
 twin.addEventListener('twin-alert', (e) => {
   const { alert } = e.detail
@@ -70,7 +70,7 @@ twin.addEventListener('twin-select', (e) => showRoomInSidebar(e.detail.id))
 
 A host that manages its own iframe can speak to the twin directly with `postMessage`. The types are in [`src/embed/protocol.ts`](../src/embed/protocol.ts).
 
-Every message carries `protocol: 'ward-twin/1'`, and both sides ignore any message without it.
+Every message carries `protocol: 'cutaway/1'`, and both sides ignore any message without it.
 
 1. When the twin can take commands, it posts `{ type: 'ready' }` to its parent, to any origin. The message carries nothing else.
 2. The host answers `{ type: 'connect' }`.
@@ -108,7 +108,7 @@ Wait for `ready` before sending `connect`. The twin's listener loads with the pa
 
 ## Changes
 
-Adding a message or a field keeps the name `ward-twin/1`. A change that would break an existing host gets a new name.
+Adding a message or a field keeps the name `cutaway/1`. A change that would break an existing host gets a new name.
 
 ## Trying it locally
 

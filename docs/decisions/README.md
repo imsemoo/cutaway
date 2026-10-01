@@ -1,6 +1,6 @@
 # Decisions
 
-Short records of the choices that shaped Ward Twin: what forced each one, what was decided, and what it costs. They are numbered in the order the questions came up, and a later decision that replaces an earlier one says so instead of rewriting it.
+Short records of the choices that shaped Cutaway: what forced each one, what was decided, and what it costs. They are numbered in the order the questions came up, and a later decision that replaces an earlier one says so instead of rewriting it.
 
 1. [Render on demand](0001-render-on-demand.md)
 2. [One wing plan, instanced across the hospital](0002-one-plan-instanced.md)

@@ -1,6 +1,6 @@
 # Architecture
 
-Ward Twin is a single-page app with no server of its own. A simulated day, or a live feed, becomes one data structure, the `Day`; every view on screen is a function of that day and a minute. The DOM interface and the 3D scene read the same store, and neither knows whether the day was recorded or is arriving live.
+Cutaway is a single-page app with no server of its own. A simulated day, or a live feed, becomes one data structure, the `Day`; every view on screen is a function of that day and a minute. The DOM interface and the 3D scene read the same store, and neither knows whether the day was recorded or is arriving live.
 
 ```mermaid
 flowchart LR
@@ -16,7 +16,7 @@ flowchart LR
   ui -- pick, scope, time --> store
   scene -- hover, pick --> store
   ui -. on first request .-> wayfinding[lib/wayfinding<br/>walking graph]
-  host[a host page<br/>the ward-twin element] <-. postMessage, in a frame .-> bridge[embed/bridge]
+  host[a host page<br/>the cutaway-twin element] <-. postMessage, in a frame .-> bridge[embed/bridge]
   bridge --> store
 ```
 
@@ -32,7 +32,7 @@ flowchart LR
 | `scene` | Everything in the canvas: the instanced shell, floors and corridors, the models, level of detail, the camera, effects, shadows, the tracker that places the tags, and the keyboard cursor ([decision 11](decisions/0011-the-model-is-one-keyboard-widget.md)). |
 | `ui` | Everything around the canvas: the top bar, the panel, the timeline, the layer switch and key, the list view, the tags, the building map. |
 | `i18n` | `say()` and `plural()`, and the Arabic catalogue. |
-| `embed` | The protocol a host page speaks with the twin in a frame, the bridge on the twin's side, and the `<ward-twin>` element built into `embed.js` for the host ([decision 10](decisions/0010-embed-through-an-iframe.md), [embed.md](embed.md)). |
+| `embed` | The protocol a host page speaks with the twin in a frame, the bridge on the twin's side, and the `<cutaway-twin>` element built into `embed.js` for the host ([decision 10](decisions/0010-embed-through-an-iframe.md), [embed.md](embed.md)). |
 
 ## The data
 
@@ -65,7 +65,7 @@ The story wing, level 4's A wing, keeps a scripted afternoon; the other 35 are s
 | Wayfinding | 1.4 kB | on the first request for a way |
 | Embed bridge | 1.3 kB | only when the twin runs in a frame |
 | Alerts read aloud | 0.9 kB | after the interface has painted |
-| `embed.js`, the `<ward-twin>` element | 1.0 kB | on the host's page |
+| `embed.js`, the `<cutaway-twin>` element | 1.0 kB | on the host's page |
 
 The day itself is computed in a worker ([decision 3](decisions/0003-simulate-in-a-worker.md)). Every chunk and the first load have budgets that block the deploy ([decision 9](decisions/0009-budgets.md)).
 

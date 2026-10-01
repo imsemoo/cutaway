@@ -37,9 +37,7 @@ export function TopBar() {
           <rect x="17.5" y="15.5" width="7" height="8" fill="#3d63ff" />
         </svg>
         <div className="brand__text">
-          <span className="brand__name" lang="en">
-            Ward Twin
-          </span>
+          <span className="brand__name">{say('Cutaway')}</span>
           <span className="brand__where">{where}</span>
         </div>
       </div>

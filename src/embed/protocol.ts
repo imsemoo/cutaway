@@ -3,16 +3,16 @@ import type { Lang } from '../i18n'
 import type { Mode } from '../state/store'
 
 /*
-  The messages between Ward Twin in an iframe and the page that embeds it.
+  The messages between Cutaway in an iframe and the page that embeds it.
   docs/embed.md is the reference; bridge.ts speaks it for the twin, and the
-  <ward-twin> element in element.ts for the host.
+  <cutaway-twin> element in element.ts for the host.
 
   Every message carries `protocol`, so both sides can ignore anything else
   that arrives through postMessage. The twin announces itself with `ready`,
   to any origin and with nothing in it; the host answers `connect`, and from
   then on the twin takes commands only from that origin and posts only to it.
 */
-export const PROTOCOL = 'ward-twin/1'
+export const PROTOCOL = 'cutaway/1'
 
 /**
   What a host can set: the same names and values as a link's parameters.
