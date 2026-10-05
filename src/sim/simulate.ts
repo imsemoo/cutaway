@@ -21,6 +21,8 @@ import type { Alert, Asset, AssetKind, AssetSpan, AssetStatus, BedRequest, BedSp
   another's.
 */
 
+import { LIMIT } from '../data/limits'
+import { callAlerts, roomAlerts } from './rules'
 import { DAY_MIN, SAMPLES, STEP } from './time'
 
 const hm = (h: number, m = 0) => h * 60 + m
@@ -474,64 +476,21 @@ function simulateWing(w: Wing, seed: number, story: boolean): Day {
   /* ---------- 5. Alerts ---------- */
 
   // Alerts carry only facts known when they open; the interface words them at the replay minute.
-  const alerts: Alert[] = []
-  const above = (series: number[], limit: number, minSamples: number) => {
-    const runs: [number, number][] = []
-    let start = -1
-    for (let s = 0; s <= SAMPLES; s++) {
-      const high = s < SAMPLES && series[s] > limit
-      if (high && start < 0) start = s
-      if (!high && start >= 0) {
-        if (s - start >= minSamples) runs.push([start * STEP, s * STEP])
-        start = -1
-      }
-    }
-    return runs
-  }
-
-  for (const room of w.rooms) {
-    const env = rooms[room.id]
-    for (const [from, to] of above(env.temp, 25.5, 1)) {
-      const peak = Math.max(...env.temp.slice(from / STEP, to / STEP))
-      alerts.push({
-        id: `temp-${room.id}-${from}`, kind: 'temp', from, to, since: from,
-        severity: peak > 26.5 ? 'critical' : 'warning',
-        target: { type: 'room', id: room.id },
-        title: 'Room too warm',
-      })
-    }
-    for (const [from, to] of above(env.co2, 1000, 2)) {
-      alerts.push({
-        id: `co2-${room.id}-${from}`, kind: 'co2', from, to, since: from,
-        severity: 'warning',
-        target: { type: 'room', id: room.id },
-        title: 'Air getting stale',
-      })
-    }
-  }
-  for (const c of calls) {
-    if (c.wait <= 5) continue
-    alerts.push({
-      id: `call-${c.room}-${c.at}`, kind: 'call', from: c.at + 5, to: c.at + c.wait, since: c.at,
-      severity: c.wait > 10 ? 'critical' : 'warning',
-      target: { type: 'room', id: c.room },
-      title: 'Call light unanswered',
-    })
-  }
+  const alerts: Alert[] = [...w.rooms.flatMap((room) => roomAlerts(room.id, rooms[room.id])), ...callAlerts(calls)]
   // Dirty beds waiting over an hour for cleaning, clean beds over two hours without a patient.
   for (const room of w.beds) {
     for (const s of spans[room.id] ?? []) {
-      if (s.state === 'dirty' && s.to - s.from > 60) {
+      if (s.state === 'dirty' && s.to - s.from > LIMIT.dirty) {
         alerts.push({
-          id: `dirty-${room.id}-${s.from}`, kind: 'dirty', from: s.from + 60, to: s.to, since: s.from,
+          id: `dirty-${room.id}-${s.from}`, kind: 'dirty', from: s.from + LIMIT.dirty, to: s.to, since: s.from,
           severity: 'warning',
           target: { type: 'room', id: room.id },
           title: 'Bed waiting for cleaning',
         })
       }
-      if (s.state === 'ready' && s.to - s.from > 120 && s.from > 0) {
+      if (s.state === 'ready' && s.to - s.from > LIMIT.ready && s.from > 0) {
         alerts.push({
-          id: `ready-${room.id}-${s.from}`, kind: 'ready', from: s.from + 120, to: s.to, since: s.from,
+          id: `ready-${room.id}-${s.from}`, kind: 'ready', from: s.from + LIMIT.ready, to: s.to, since: s.from,
           severity: 'info',
           target: { type: 'room', id: room.id },
           title: 'Clean bed not assigned',
@@ -548,7 +507,7 @@ function simulateWing(w: Wing, seed: number, story: boolean): Day {
       const m = s * STEP
       while (j < a.spans.length && a.spans[j].to <= m) j++
       const inUse = j < a.spans.length && a.spans[j].status === 'in-use' && m >= a.spans[j].from
-      const low = s < SAMPLES && inUse && a.battery[s] < 20
+      const low = s < SAMPLES && inUse && a.battery[s] < LIMIT.battery
       if (low && start < 0) start = s
       if (!low && start >= 0) {
         alerts.push({

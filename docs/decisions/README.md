@@ -15,3 +15,5 @@ Short records of the choices that shaped Cutaway: what forced each one, what was
 11. [The model is one keyboard widget](0011-the-model-is-one-keyboard-widget.md)
 12. [Operators acknowledge; the data clears](0012-operators-acknowledge-the-data-clears.md)
 13. [A forecast from what is known, checked against the day](0013-a-forecast-checked-against-the-day.md)
+14. [An integration server between the hospital's systems and the twin](0014-an-integration-server-between-the-systems-and-the-twin.md)
+15. [A real building, read from its IFC model at build time](0015-a-real-building-read-at-build-time.md)

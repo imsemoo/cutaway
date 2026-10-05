@@ -105,6 +105,33 @@ What makes it a tool an operator could work in, not only watch.
 - A backtest makes the forecast at every half hour of the day in every wing and measures how often the range held and how far its middle was off.
 - **Done when:** every overview shows the next four hours, the backtest runs in the unit tests, and the README and the making-of quote its numbers.
 
+## Phase 5: integration
+
+What it takes to connect a real hospital.
+
+### 5.1 An integration server, fed over MQTT
+- The hospital's systems as they talk in practice: building sensors, bed status, nurse call, location tags and patient flow each publish small JSON messages on MQTT topics. The contract is written down, topic by topic.
+- An integration server between them and the twin: it subscribes, turns messages into the feed's numbered events, serves the feed over WebSocket, and derives the alerts itself from the raw readings by the same rules, where the demo's mock copies them from the simulation. An operator's action is logged as before and dispatched back on MQTT to the team it was sent to.
+- One command runs a whole simulated hospital: a broker, the devices replaying the day, and the server; the twin connects with `VITE_FEED_URL`, as a deployment would.
+- **Done when:** the recorded day, published as device messages and passed through the server, comes out as exactly the recording's event log, alerts included; a test runs the broker, the server and a feed client end to end; the docs show how each real system maps onto a topic.
+
+## Phase 6: a real building
+
+So far the hospital is drawn from a plan written in code. A hospital's own buildings come as BIM models, in IFC.
+
+The model: the Medical-Dental Clinic from buildingSMART's community samples, a real two-storey clinic with medical, dental and imaging rooms and a paediatric waiting area, redacted ("BSI (2020) Medical-Dental Test Files, buildingSMART International", https://github.com/buildingsmart-community/Community-Sample-Test-Files, CC BY 4.0: free to copy and change, crediting the source and saying what was changed). Its architectural file is 13 MB of IFC 2x3.
+
+### 6.1 An IFC importer
+- A command that reads an IFC file at build time (web-ifc, in Node; nothing of it ships to the page) and writes a compact building file: storeys, every space with its name, kind and floor outline, and the doors between spaces.
+- The IFC file stays out of the repository; the building file carries the attribution and what was changed.
+- **Done when:** the clinic imports with one command, and a test checks the spaces per storey and their areas against the IFC's own figures.
+
+### 6.2 The clinic in the twin
+- `?building=clinic` opens the imported clinic: its rooms drawn from their outlines, walls and doors, in 3D, in plan and in the list view, with picking, tags and the keyboard.
+- The layers read a simulated day for the clinic's own rooms: exam and treatment rooms turning over between patients, temperature and air, call lights. The alerts follow the same rules.
+- The hospital stays as it is; the clinic is a second building beside it, labelled as a real plan with simulated data.
+- **Done when:** the clinic opens from a link, every layer and view works on it, and the first load and the hospital's numbers are unchanged.
+
 ## Status
 
 - [x] 1.1 Tests and CI: 23 unit tests, 8 browser tests at two sizes, lint, types and a bundle budget, all gating the deploy, green on GitHub.
@@ -121,3 +148,6 @@ What makes it a tool an operator could work in, not only watch.
 - [x] 3.4 Accessibility: the model as one keyboard widget (arrow keys by screen direction, Enter, Escape, each move said aloud), alerts said as they open, axe-core checks of eight views at two sizes in CI; decision 11. Not yet tried with a daily screen-reader user
 - [x] 4.1 Alert handling: acknowledge, then send to the owning team, with a log in each room that reads back at any minute and says when an alert cleared unseen; actions through the feed with an outbox that survives the demo's outage, logged once by id; `acknowledged` and `sentTo` in the embed's alerts; decision 12
 - [x] 4.2 A capacity forecast: ward beds four hours ahead in every overview, as a likely value and a range, from plans, requests and turnover the simulation now records, identical when built from the live feed; the backtest holds the range 93.6 % of the time per wing four hours ahead and 80.0 % for the hospital over twelve other days, `npm run backtest`; decision 13
+- [x] 5.1 An integration server, fed over MQTT: one topic per room, asset and flow (`src/integration/topics.ts`), a server that checks messages, works out every alert from raw data and serves the feed through the hub it shares with the mock; `npm run hospital` with `npm run dev:hospital`; the whole day as 1,005,153 device messages comes out as exactly the recording's 21,904 events with all 881 alerts; an end-to-end test with a broker, the server, a screen and a team; QoS 1 after QoS 0 lost most of a burst; decision 14
+- [x] 6.1 An IFC importer: `npm run ifc:import` reads the clinic's 13 MB IFC with web-ifc in Node and writes a 34 kB building file (gzipped): 259 rooms on two floors with their outlines, names, OmniClass kinds and stated areas, 1,297 wall footprints and 247 doors with the rooms they join; every room's area within 10 % of the model's own figure once the walls it is measured to are counted, all but one within 5 %; re-importing gives the committed file; the IFC stays out of the repository, docs/buildings.md says where to fetch it; decision 15
+- [x] 6.2 The clinic in the twin: `?building=clinic`, linked from the hospital's overviews, in 3D, plan and list, both floors side by side or one at a time, with the four layers, picking, tags, links, playback and Arabic; a simulated clinic day on its own rooms, its alerts by the hospital's rules; the hospital's first load went from 90.9 kB to 89.7 kB, as a room's details now load after the first paint, and the clinic adds 11.5 kB and its 34 kB plan

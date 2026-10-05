@@ -84,7 +84,9 @@ The page:
 
 ## Plugging in a real source
 
-1. Run a server that speaks this protocol. It keeps each day's events in order with a `seq`, publishes each one as it happens, ticks once a second, answers subscribe from a buffer of recent events, and logs each `act` once, as an event, passing it on to the team's own system.
+The integration server in `src/integration` is one: it takes the hospital's systems over MQTT and serves this protocol. [integration.md](integration.md) has its topics and how to run it with a simulated hospital (`npm run hospital`). Any other server works the same way:
+
+1. Speak this protocol. Keep each day's events in order with a `seq`, publish each one as it happens, tick once a second, answer subscribe from a buffer of recent events, and log each `act` once, as an event, passing it on to the team's own system. `src/live/hub.ts` does all of that, for the mock and for the integration server.
 2. Map each system to events, as in the table above.
 3. Build the page with `VITE_FEED_URL=wss://your-server/ward npm run build`.
 

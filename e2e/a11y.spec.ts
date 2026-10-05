@@ -13,6 +13,9 @@ const PAGES = [
   ['a level', '/?at=level-4'],
   ['live mode', '/?mode=live'],
   ['the Arabic interface', '/?lang=ar&select=4A09'],
+  ['the clinic', '/?building=clinic'],
+  ['a clinic room, in Arabic', '/?building=clinic&lang=ar&room=2A12'],
+  ['the clinic list view', '/?building=clinic&view=list'],
   ['the demo host page', '/host/'],
 ] as const
 

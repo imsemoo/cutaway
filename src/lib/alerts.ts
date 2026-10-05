@@ -1,5 +1,6 @@
 import type { Alert, AlertKind, Day, Severity } from '../data/types'
 import { say } from '../i18n'
+import { LIMIT } from '../data/limits'
 import { batteryAt, clock, duration, sample } from './query'
 
 /** Each kind's title, in English; alertTitle gives it in the language on show. */
@@ -41,9 +42,9 @@ export function describe(alert: Alert, day: Day, t: number): string {
 export function severityAt(alert: Alert, day: Day, t: number): Severity {
   switch (alert.kind) {
     case 'temp':
-      return sample(day.rooms[alert.target.id].temp, t) > 26.5 ? 'critical' : 'warning'
+      return sample(day.rooms[alert.target.id].temp, t) > LIMIT.tempCritical ? 'critical' : 'warning'
     case 'call':
-      return t - alert.since > 10 ? 'critical' : 'warning'
+      return t - alert.since > LIMIT.callCritical ? 'critical' : 'warning'
     default:
       return alert.severity
   }

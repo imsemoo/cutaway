@@ -1,6 +1,6 @@
 # Architecture
 
-Cutaway is a single-page app with no server of its own. A simulated day, or a live feed, becomes one data structure, the `Day`; every view on screen is a function of that day and a minute. The DOM interface and the 3D scene read the same store, and neither knows whether the day was recorded or is arriving live.
+Cutaway is a single-page app with no server of its own; an integration server for a real hospital's systems comes with it ([integration.md](integration.md)). A simulated day, or a live feed, becomes one data structure, the `Day`; every view on screen is a function of that day and a minute. The DOM interface and the 3D scene read the same store, and neither knows whether the day was recorded or is arriving live.
 
 ```mermaid
 flowchart LR
@@ -29,13 +29,15 @@ flowchart LR
 
 | Folder | What it holds |
 |---|---|
-| `data` | The hospital: six levels of six wings, all built to one plan, and the `Day` types. |
+| `data` | The hospital: six levels of six wings, all built to one plan, the `Day` types, and the alert rules' limits. |
 | `sim` | The simulation of a day, seeded per wing, and the worker that runs it. |
-| `live` | The feed protocol, the event log and its fold into a `Day`, the client with resume and backoff, and the mock server. Loaded only in live mode. |
+| `live` | The feed protocol, the event log and its fold into a `Day`, the client with resume and backoff, the server's side of the protocol (`hub.ts`), and the mock server. Loaded only in live mode. |
+| `integration` | Not part of the page: the integration server, which takes the hospital's systems over MQTT, works out the alerts and serves the feed; the MQTT contract; the simulated devices; and `npm run hospital` ([decision 14](decisions/0014-an-integration-server-between-the-systems-and-the-twin.md)). |
 | `state` | The store (zustand), the scope (hospital, level or wing), the adaptive quality level, and an operator's actions on alerts. |
 | `lib` | Queries over a day at a minute, alert wording and handling, colours, equipment positions, wayfinding, and the capacity forecast. |
 | `scene` | Everything in the canvas: the instanced shell, floors and corridors, the models, level of detail, the camera, effects, shadows, the tracker that places the tags, and the keyboard cursor ([decision 11](decisions/0011-the-model-is-one-keyboard-widget.md)). |
 | `ui` | Everything around the canvas: the top bar, the panel, the alert list and its actions, the forecast, the timeline, the layer switch and key, the list view, the tags, the building map. |
+| `clinic` | The clinic's page, opened by `?building=clinic` and loaded only then: its building file and simulated day, its scene drawn from the model's outlines, its panel, list and layout ([decision 15](decisions/0015-a-real-building-read-at-build-time.md), [buildings.md](buildings.md)). |
 | `i18n` | `say()` and `plural()`, and the Arabic catalogue. |
 | `embed` | The protocol a host page speaks with the twin in a frame, the bridge on the twin's side, and the `<cutaway-twin>` element built into `embed.js` for the host ([decision 10](decisions/0010-embed-through-an-iframe.md), [embed.md](embed.md)). |
 
@@ -46,6 +48,8 @@ A `Day` holds, for every room, its bed states as spans and its temperature and C
 The story wing, level 4's A wing, keeps a scripted afternoon; the other 35 are simulated from their own seeds. The day covers 1,368 rooms, 1,008 beds and 3,006 pieces of equipment.
 
 It also holds what a hospital knows ahead and what its operators do. The requests for ward beds and the discharges the morning round planned come from a random stream of their own, so adding them left the rest of the day as it was; the capacity forecast reads them ([decision 13](decisions/0013-a-forecast-checked-against-the-day.md)). Operators' actions on alerts, each at its minute, join the day as they are taken, in replay at once and live through the server ([decision 12](decisions/0012-operators-acknowledge-the-data-clears.md)), so how an alert stands is read at a minute like everything else.
+
+The clinic is a second building beside the hospital, read from its BIM model into `public/buildings/clinic.json` (`src/data/building.ts`): storeys, rooms with their outlines and kinds, wall footprints and doors. Its day has the same shape as the hospital's, simulated on its own rooms by `src/clinic/simulate.ts`, so every view and query reads it unchanged.
 
 ## The scene
 
@@ -61,8 +65,8 @@ It also holds what a hospital knows ahead and what its operators do. The request
 
 | Chunk | Gzipped | When |
 |---|---|---|
-| Entry and the three small chunks it imports | 90.8 kB | first, before the interface paints |
-| Scene | 215 kB | after the interface has painted |
+| Entry and the small chunks it imports | 89.7 kB | first, before the interface paints |
+| Scene, and the 3D code it shares with the clinic | 217 kB | after the interface has painted |
 | three.js core | 99 kB | with the scene |
 | glTF loader and meshopt | 20 kB | with the models |
 | Effects (ambient occlusion, SMAA) | 157 kB | only at the quality levels that use them |
@@ -71,6 +75,8 @@ It also holds what a hospital knows ahead and what its operators do. The request
 | List view | 1.3 kB | when the list view is opened |
 | Alert list and its actions | 2.1 kB | after the interface has painted |
 | The forecast | 3.0 kB | after the interface has painted |
+| A room's and a piece of equipment's details | 3.2 kB | after the interface has painted |
+| The clinic's page, and its building file | 11.5 kB, 34 kB | only on `?building=clinic` |
 | Wayfinding | 1.4 kB | on the first request for a way |
 | Embed bridge | 1.4 kB | only when the twin runs in a frame |
 | Alerts read aloud | 0.9 kB | after the interface has painted |
@@ -80,9 +86,9 @@ The day itself is computed in a worker ([decision 3](decisions/0003-simulate-in-
 
 ## Tests
 
-- 86 unit tests (Vitest): the plan, the simulation, the queries and alert wording, alert handling, the live feed with its fold and its outbox, the capacity forecast and its backtest, the wayfinding graph, the corridor field's data, the Arabic catalogue, the embed bridge in a fake frame, and the keyboard cursor's steps.
-- 24 browser tests (Playwright), each at desktop and phone size with real WebGL, and each failing on any console error. One embeds the twin in a page on another origin; one drives the model from the keyboard; one sends an alert to its team while the live server is down.
-- axe-core checks of eight views against WCAG 2.2 A and AA, at both sizes, run as a later stage so their weight never crowds the timing-sensitive live-mode test.
+- 111 unit tests (Vitest): the plan, the simulation, the queries and alert wording, alert handling, the live feed with its fold, its outbox and its server side, the integration server's engine on the whole day and the server end to end over MQTT and WebSocket, the capacity forecast and its backtest, the wayfinding graph, the corridor field's data, the Arabic catalogue, the embed bridge in a fake frame, the keyboard cursor's steps, the clinic's building file against its IFC model, and the clinic's day.
+- 29 browser tests (Playwright), each at desktop and phone size with real WebGL, and each failing on any console error. One embeds the twin in a page on another origin; one drives the model from the keyboard; one sends an alert to its team while the live server is down.
+- axe-core checks of eleven views against WCAG 2.2 A and AA, at both sizes, run as a later stage so their weight never crowds the timing-sensitive live-mode test.
 - Types, lint and the bundle budgets. CI runs all of it before every deploy to GitHub Pages.
 
 ## Decisions

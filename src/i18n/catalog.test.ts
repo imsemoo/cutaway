@@ -1,5 +1,7 @@
 import ts from 'typescript'
 import { describe, expect, it } from 'vitest'
+import clinic from '../../public/buildings/clinic.json'
+import { KIND_LABEL, KIND_ONE } from '../clinic/labels'
 import { WINGS, isBed } from '../data/floorplan'
 import { ALERT_TITLE } from '../lib/alerts'
 import { TEAM_LABEL } from '../lib/handling'
@@ -34,7 +36,7 @@ function keysInCode() {
         if (node.expression.text === 'plural') literals(node.arguments[2]).forEach((k) => counted.add(k))
       }
       // The view, layer and mode switches keep their labels in arrays and pass them through say().
-      if (ts.isPropertyAssignment(node) && node.name.getText(source) === 'label' && file.startsWith('../ui/')) {
+      if (ts.isPropertyAssignment(node) && node.name.getText(source) === 'label' && (file.startsWith('../ui/') || file.startsWith('../clinic/'))) {
         literals(node.initializer).forEach((k) => said.add(k))
       }
       ts.forEachChild(node, visit)
@@ -53,6 +55,10 @@ function keysInData() {
     ...Object.values(ASSET_STATUS_LABEL),
     ...Object.values(ALERT_TITLE),
     ...Object.values(TEAM_LABEL),
+    ...Object.values(KIND_LABEL),
+    ...Object.values(KIND_ONE),
+    // The clinic's floors keep the names its model gives them.
+    ...clinic.storeys.map((s) => s.name),
     ...WINGS[0].rooms.filter((r) => !isBed(r)).map((r) => r.name),
     ...Object.values(day.rooms).flatMap((r) => r.spans.map((s) => s.note).filter((n): n is string => !!n)),
     'critical',

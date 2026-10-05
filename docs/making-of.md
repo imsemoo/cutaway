@@ -81,6 +81,24 @@ Two faults explained it. The draw of how many patients arrive returned −1, not
 
 One day is a thin test for the hospital as a whole, so the unit tests also run it over twelve other simulated days, where it holds 80% of the time four hours ahead, as it aims to. `npm run backtest` prints both tables.
 
+## A server for a real hospital
+
+The live feed's documentation said a real source needed a server that speaks the protocol; now there is one ([decision 14](decisions/0014-an-integration-server-between-the-systems-and-the-twin.md), [integration.md](integration.md)). The hospital's systems publish raw messages on MQTT, a million a day; the server checks them, works out the alerts by the simulation's own limits, and serves the feed. The test that matters publishes the whole recorded day as those raw messages and requires the server's engine to produce exactly the recording's event log, 21,904 events with every one of its 881 alerts, though it is given none of them.
+
+It passed on its first full run, after one fault in the recording. A live engine flags stale air at the second high reading, since the rule needs two in a row; the simulation had flagged it at the first, as if it knew the second would follow. The alerts carry only what is known when they open, the code says, and this one knew five minutes more. The simulation now flags it at the confirming reading.
+
+Running it as one machine-sized hospital found the second fault, in the plumbing. The systems' devices published the day so far, 612,883 messages, at MQTT's lowest quality of service, and ten seconds later the server had received 24,829: the broker drops what a subscriber cannot take as fast as it comes, and the twin showed one occupied bed. At QoS 1, with a few hundred messages in flight at a time, every message arrives, in about 23 seconds.
+
+## A real building
+
+Every wing of the hospital is built to one plan, which is what lets 36 of them draw as instances, and also what a real building never is. So the twin now reads one: buildingSMART's Medical-Dental Clinic, a real two-storey clinic published as a 13 MB IFC file ([decision 15](decisions/0015-a-real-building-read-at-build-time.md), [buildings.md](buildings.md)). web-ifc reads it at build time, in Node, and each room's outline is cut from its own mesh, the boundary of its lowest face. The page loads 34 kB of outlines, names and doors, and never the parser.
+
+The check is the model's own figures. Each room states its area, and the outlines came out a median 7.6 % small, up to 29 % in narrow rooms, which looked like a fault in the cutting until the reason showed: the model measures a room to the middle of its walls, and an outline stops at their faces. Counting half of a 12 cm wall around each room, the median room is within 0.7 % of the stated area and all but one of 259 within 5 %. A narrow room has the most wall for its floor, which is why it looked the worst.
+
+Its tests found two faults the screenshots had not. The simulated clinic rang a call light a minute after the patient had left: a call drawn at a random point in a five-minute slot could fall past the end of the visit. And on a phone the switch between the clinic's floors showed three empty buttons, because phone widths keep only the icons of every switch and this one, alone, has words only.
+
+The clinic page cost the hospital first. It shares the store, the language and the icons with the entry, and the bundler cut more of them into chunks of their own: the first load went from 90.9 kB to 91.7 kB, over its budget. Rather than raise the budget, a room's and a piece of equipment's details moved after the first paint, as the alert list had, since neither can show anything before the day arrives. The first load is 89.7 kB.
+
 ## Not measured yet
 
 Every number here comes from one laptop and emulated phones. A low-end Android phone and an iPhone are the tests the project still needs, and so is an afternoon with someone who uses a screen reader every day.

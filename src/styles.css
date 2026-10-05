@@ -852,6 +852,10 @@ button {
   background: var(--crit);
   box-shadow: 0 0 0 2px var(--surface);
 }
+/* The clinic's rooms keep the model's ids, up to five characters, so its cells are sized to them. */
+.board__cells--wide {
+  grid-template-columns: repeat(auto-fill, minmax(44px, 1fr));
+}
 
 .keys {
   display: flex;
@@ -1712,6 +1716,10 @@ button {
     display: none;
   }
   .seg--dock .seg__btn[aria-checked='true'] span {
+    display: inline;
+  }
+  /* A switch in words only, such as the clinic's floors, keeps its words. */
+  .seg--text .seg__btn span {
     display: inline;
   }
   .seg__btn {
