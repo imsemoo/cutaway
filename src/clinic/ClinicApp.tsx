@@ -1,26 +1,26 @@
-import { BedDouble, BellRing, Box, List, Map as MapIcon, Pause, Play, Thermometer, Wind } from 'lucide-react'
+import { BedDouble, BellRing, Box, List, Map as MapIcon, Thermometer, Wind } from 'lucide-react'
 import { Suspense, lazy, useEffect, useLayoutEffect, useRef } from 'react'
 import type { Building, BuildingSpace } from '../data/building'
 import type { BedState, Layer, View } from '../data/types'
 import { plural, say, setLang, useLang } from '../i18n'
-import { alertTitle } from '../lib/alerts'
-import { AIR_STOPS, BED, SEVERITY, TEMP_STOPS, callColor } from '../lib/colors'
+import { AIR_STOPS, BED, TEMP_STOPS, callColor } from '../lib/colors'
 import { activeCall, bedAt, bedLabel, clock, sample } from '../lib/query'
 import { setAnchor } from '../scene/tags'
 import { HOSPITAL } from '../state/scope'
-import { DEFAULT_TIME, SPEEDS, useWard } from '../state/store'
+import { DEFAULT_TIME, useWard } from '../state/store'
+import { Stale, Timeline } from '../ui/Timeline'
 import { ClinicPanel } from './ClinicPanel'
 import { floorName } from './labels'
 import { WALL, floorOffset, shows } from './layout'
-import { simulateClinic } from './simulate'
+import { CLINIC_SEED, simulateClinic } from './simulate'
 import { useClinic } from './state'
 
 /*
   The twin on a real building: the Medical-Dental Clinic, imported from its
-  BIM model (tools/ifc, public/buildings/clinic.json), with a simulated day.
-  It shares the hospital's store, alert list, charts and styles; what is
-  its own is the building, its scene and its panel. Opened with
-  ?building=clinic, and loaded only then.
+  BIM model (tools/ifc, public/buildings/clinic.json), with a simulated day,
+  replayed or live from a feed of its own. It shares the hospital's store,
+  timeline, alert list, charts and styles; what is its own is the building,
+  its scene and its panel. Opened with ?building=clinic, and loaded only then.
 */
 
 const ClinicScene = lazy(() => import('./ClinicScene'))
@@ -28,9 +28,12 @@ const ClinicList = lazy(() => import('./ClinicList'))
 
 export default function ClinicApp() {
   const view = useWard((s) => s.view)
+  const live = useWard((s) => s.mode === 'live')
+  const waiting = useWard((s) => !s.day)
   const building = useClinic((s) => s.building)
   const lang = useLang((s) => s.lang)
   useBuilding()
+  useLiveFeed()
   useClinicUrl()
   useEffect(() => {
     document.title = say('Cutaway: a clinic from its BIM model')
@@ -52,13 +55,14 @@ export default function ClinicApp() {
             <ClinicList />
           </Suspense>
         )}
-        {!building && (
+        {(!building || waiting) && (
           <div className="loading" role="status">
-            {say('Reading the clinic’s model…')}
+            {building && live ? say('Connecting to the live feed…') : say('Reading the clinic’s model…')}
           </div>
         )}
+        <Stale />
       </main>
-      <ClinicTimeline key={lang} />
+      <Timeline key={lang} every />
       <div id="details" className="panel-wrap">
         <ClinicPanel />
       </div>
@@ -66,7 +70,7 @@ export default function ClinicApp() {
   )
 }
 
-/** Fetches the building, simulates its day, and hands both to the stores; a link's room is selected once it is there. */
+/** Fetches the building, simulates its day, and hands both to the stores; a link's room is selected once it is there. Live, the day waits for the feed, and the recording for a switch back to replay. */
 function useBuilding() {
   useEffect(() => {
     let left = false
@@ -78,7 +82,7 @@ function useBuilding() {
         const id = new URLSearchParams(location.search).get('room')?.toUpperCase()
         const room = building.spaces.find((s) => s.id === id)
         useClinic.setState({ building, ...(room && { floors: room.storey }) })
-        useWard.setState({ day, recorded: day, complete: true, scope: HOSPITAL, selection: room ? { type: 'room', id: room.id } : null })
+        useWard.setState((s) => ({ recorded: day, ...(s.mode === 'replay' && { day, complete: true }), scope: HOSPITAL, selection: room ? { type: 'room', id: room.id } : null }))
       })
     return () => {
       left = true
@@ -86,7 +90,25 @@ function useBuilding() {
   }, [])
 }
 
-/** Keeps the address bar in step: building=clinic, then the room, minute, layer and view. */
+/** In live mode, opens the clinic's own feed: the integration server's when VITE_CLINIC_FEED_URL is set, else the demo's mock server playing the clinic's day. */
+function useLiveFeed() {
+  const live = useWard((s) => s.mode === 'live')
+  const building = useClinic((s) => s.building)
+  useEffect(() => {
+    if (!live || !building) return
+    let close: (() => void) | undefined
+    let left = false
+    void import('../live/connect').then(({ connect }) => {
+      if (!left) close = connect({ url: import.meta.env.VITE_CLINIC_FEED_URL as string | undefined, seed: CLINIC_SEED, building })
+    })
+    return () => {
+      left = true
+      close?.()
+    }
+  }, [live, building])
+}
+
+/** Keeps the address bar in step: building=clinic, then the room, minute, layer, view and mode. */
 function useClinicUrl() {
   useEffect(() => {
     const write = () => {
@@ -98,7 +120,9 @@ function useClinicUrl() {
       set('select', null)
       set('layer', s.layer === 'beds' ? null : s.layer)
       set('view', s.view === '3d' ? null : s.view)
-      set('t', Math.round(s.t) === DEFAULT_TIME ? null : clock(s.t))
+      // Live time is the feed's, so a live link carries no time.
+      set('t', s.mode === 'live' || Math.round(s.t) === DEFAULT_TIME ? null : clock(s.t))
+      set('mode', s.mode === 'live' ? 'live' : null)
       const next = `?${q.toString().replace(/%3A/g, ':')}`
       if (next !== location.search) history.replaceState(null, '', next)
     }
@@ -132,7 +156,7 @@ function usePlayback() {
   }, [playing])
 }
 
-/** Escape leaves a room; Space plays the day, outside buttons and fields. */
+/** Escape leaves a room; Space plays the replay, outside buttons and fields. */
 function useEscape() {
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
@@ -140,7 +164,7 @@ function useEscape() {
       if (el.closest('input, textarea, select')) return
       const s = useWard.getState()
       if (e.key === 'Escape' && s.selection) s.select(null)
-      else if (e.key === ' ' && !el.closest('button, a, [role="radio"]')) {
+      else if (e.key === ' ' && s.mode === 'replay' && !el.closest('button, a, [role="radio"]')) {
         e.preventDefault()
         s.setPlaying(!s.playing)
       }
@@ -256,74 +280,6 @@ function ClinicDock() {
         </div>
       )}
     </div>
-  )
-}
-
-/** Play, the clock, and the day's track with its alerts marked; replay only, as the clinic has no feed. */
-function ClinicTimeline() {
-  const day = useWard((s) => s.day)
-  const t = useWard((s) => s.t)
-  const playing = useWard((s) => s.playing)
-  const speed = useWard((s) => s.speed)
-  const setT = useWard((s) => s.setT)
-  const setPlaying = useWard((s) => s.setPlaying)
-  const setSpeed = useWard((s) => s.setSpeed)
-  return (
-    <footer className="timeline" dir="ltr">
-      <button
-        className="play"
-        onClick={() => {
-          if (!playing && t >= 1435) setT(0)
-          setPlaying(!playing)
-        }}
-        aria-label={playing ? say('Pause the replay') : say('Play the day')}
-        disabled={!day}
-      >
-        {playing ? <Pause size={18} strokeWidth={2} aria-hidden="true" /> : <Play size={18} strokeWidth={2} aria-hidden="true" />}
-      </button>
-      <output className="clock num" aria-live="off">
-        {clock(t)}
-      </output>
-      <div className="track">
-        <div className="track__hours" aria-hidden="true">
-          {[0, 3, 6, 9, 12, 15, 18, 21, 24].map((h) => (
-            <span key={h} style={{ left: `${(h / 24) * 100}%` }}>
-              {String(h).padStart(2, '0')}
-            </span>
-          ))}
-        </div>
-        <div className="track__rail" aria-hidden="true">
-          <span className="track__fill" style={{ width: `${(t / 1440) * 100}%` }} />
-          {(day?.alerts ?? []).map((a) => (
-            <i key={a.id} className="track__mark" style={{ left: `${(a.from / 1440) * 100}%`, background: SEVERITY[a.severity] }} title={`${clock(a.from)} ${alertTitle(a)} ${a.target.id}`} />
-          ))}
-        </div>
-        <input
-          className="track__input"
-          type="range"
-          min={0}
-          max={1439}
-          step={5}
-          value={Math.round(t)}
-          onChange={(e) => {
-            setPlaying(false)
-            setT(Number(e.target.value))
-          }}
-          aria-label={say('Time of day')}
-          aria-valuetext={clock(t)}
-          disabled={!day}
-        />
-      </div>
-      <div className="timeline__end">
-        <div className="seg seg--small" role="radiogroup" aria-label={say('Replay speed')}>
-          {SPEEDS.map((s) => (
-            <button key={s} role="radio" aria-checked={speed === s} className="seg__btn" onClick={() => setSpeed(s)} aria-label={plural(s, '{n} simulated minute per second', '{n} simulated minutes per second')}>
-              <span className="num">{s === 60 ? say('1 h/s') : say('{n} min/s', { n: s })}</span>
-            </button>
-          ))}
-        </div>
-      </div>
-    </footer>
   )
 }
 

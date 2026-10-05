@@ -99,6 +99,14 @@ Its tests found two faults the screenshots had not. The simulated clinic rang a 
 
 The clinic page cost the hospital first. It shares the store, the language and the icons with the entry, and the bundler cut more of them into chunks of their own: the first load went from 90.9 kB to 91.7 kB, over its budget. Rather than raise the budget, a room's and a piece of equipment's details moved after the first paint, as the alert list had, since neither can show anything before the day arrives. The first load is 89.7 kB.
 
+## The real building, live
+
+The clinic had a real plan and a replayed day. To run it live, the integration server had to learn that it serves a building, not the hospital: a building became a site, with its own topic root, its own rooms and its own rules, and a server serves one ([decision 16](decisions/0016-a-feed-for-each-building.md)). The clinic's rules leave out turnover, since an empty exam room is not an alarm.
+
+The check was the one the hospital passed: the clinic's whole day told as raw messages, 78,452 of them, through the clinic's engine, must come out as exactly its recorded log. Against the recording as it stood, it fails, on a fault in the recording rather than the engine. At the end of the day the clinic's simulation wrote two ready spans in a row for every one of its 49 care rooms, where a server that passes on a repeated status once writes one: room 1A15 was ready from 17:45, and its "ready since" would have jumped to 17:57 with nothing happening. The simulation now keeps one span to midnight, and the log matches: 2,730 events, all 11 alerts.
+
+On the page, the clinic switched to the hospital's own timeline, with its Replay and Live switch and the connection's state, instead of keeping a replay-only copy of it; its code came out 0.2 kB smaller.
+
 ## Not measured yet
 
 Every number here comes from one laptop and emulated phones. A low-end Android phone and an iPhone are the tests the project still needs, and so is an afternoon with someone who uses a screen reader every day.

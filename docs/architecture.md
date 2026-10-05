@@ -32,7 +32,7 @@ flowchart LR
 | `data` | The hospital: six levels of six wings, all built to one plan, the `Day` types, and the alert rules' limits. |
 | `sim` | The simulation of a day, seeded per wing, and the worker that runs it. |
 | `live` | The feed protocol, the event log and its fold into a `Day`, the client with resume and backoff, the server's side of the protocol (`hub.ts`), and the mock server. Loaded only in live mode. |
-| `integration` | Not part of the page: the integration server, which takes the hospital's systems over MQTT, works out the alerts and serves the feed; the MQTT contract; the simulated devices; and `npm run hospital` ([decision 14](decisions/0014-an-integration-server-between-the-systems-and-the-twin.md)). |
+| `integration` | Not part of the page: the integration server, which takes a building's systems over MQTT, works out the alerts and serves the feed; the buildings it can serve, each a site with its topic root, rooms and rules; the MQTT contract; the simulated devices; and `npm run hospital` ([decisions 14](decisions/0014-an-integration-server-between-the-systems-and-the-twin.md) and [16](decisions/0016-a-feed-for-each-building.md)). |
 | `state` | The store (zustand), the scope (hospital, level or wing), the adaptive quality level, and an operator's actions on alerts. |
 | `lib` | Queries over a day at a minute, alert wording and handling, colours, equipment positions, wayfinding, and the capacity forecast. |
 | `scene` | Everything in the canvas: the instanced shell, floors and corridors, the models, level of detail, the camera, effects, shadows, the tracker that places the tags, and the keyboard cursor ([decision 11](decisions/0011-the-model-is-one-keyboard-widget.md)). |
@@ -86,9 +86,9 @@ The day itself is computed in a worker ([decision 3](decisions/0003-simulate-in-
 
 ## Tests
 
-- 111 unit tests (Vitest): the plan, the simulation, the queries and alert wording, alert handling, the live feed with its fold, its outbox and its server side, the integration server's engine on the whole day and the server end to end over MQTT and WebSocket, the capacity forecast and its backtest, the wayfinding graph, the corridor field's data, the Arabic catalogue, the embed bridge in a fake frame, the keyboard cursor's steps, the clinic's building file against its IFC model, and the clinic's day.
-- 29 browser tests (Playwright), each at desktop and phone size with real WebGL, and each failing on any console error. One embeds the twin in a page on another origin; one drives the model from the keyboard; one sends an alert to its team while the live server is down.
-- axe-core checks of eleven views against WCAG 2.2 A and AA, at both sizes, run as a later stage so their weight never crowds the timing-sensitive live-mode test.
+- 113 unit tests (Vitest): the plan, the simulation, the queries and alert wording, alert handling, the live feed with its fold, its outbox and its server side, the integration server's engine on the whole day of each building and the server end to end over MQTT and WebSocket, the capacity forecast and its backtest, the wayfinding graph, the corridor field's data, the Arabic catalogue, the embed bridge in a fake frame, the keyboard cursor's steps, the clinic's building file against its IFC model, and the clinic's day.
+- 30 browser tests (Playwright), each at desktop and phone size with real WebGL, and each failing on any console error. One embeds the twin in a page on another origin; one drives the model from the keyboard; one sends an alert to its team while the live server is down.
+- axe-core checks of twelve views against WCAG 2.2 A and AA, at both sizes, run as a later stage so their weight never crowds the timing-sensitive live-mode test.
 - Types, lint and the bundle budgets. CI runs all of it before every deploy to GitHub Pages.
 
 ## Decisions

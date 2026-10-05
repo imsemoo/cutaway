@@ -16,6 +16,7 @@ const PAGES = [
   ['the clinic', '/?building=clinic'],
   ['a clinic room, in Arabic', '/?building=clinic&lang=ar&room=2A12'],
   ['the clinic list view', '/?building=clinic&view=list'],
+  ['the clinic live', '/?building=clinic&mode=live'],
   ['the demo host page', '/host/'],
 ] as const
 

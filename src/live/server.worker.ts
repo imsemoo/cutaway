@@ -1,3 +1,5 @@
+import { simulateClinic } from '../clinic/simulate'
+import type { Building } from '../data/building'
 import { SEED, simulate } from '../sim/simulate'
 import { DAY_MIN } from '../sim/time'
 import { toEvents } from './events'
@@ -5,8 +7,8 @@ import { createHub } from './hub'
 import type { ClientMessage } from './protocol'
 
 /*
-  The mock server behind the live feed. It publishes the simulated day as
-  events, one simulated minute each second, from the minute the page first
+  The mock server behind the live feed. It publishes the simulated day, the
+  hospital's or, booted with it, the clinic's, as events, one simulated minute each second, from the minute the page first
   asks for, and keeps going while nobody is connected. A subscriber that
   comes back soon enough gets only what it missed; one that has been away
   too long, or is on yesterday, gets the whole day so far. At midnight the
@@ -22,13 +24,14 @@ import type { ClientMessage } from './protocol'
   carry the same text frames a WebSocket would.
 */
 
-type Pipe = { op: 'boot'; start: number } | { op: 'outage'; ms: number } | { op: 'open' | 'close'; conn: number } | { op: 'send'; conn: number; text: string }
+type Pipe = { op: 'boot'; start: number; building?: Building } | { op: 'outage'; ms: number } | { op: 'open' | 'close'; conn: number } | { op: 'send'; conn: number; text: string }
 
 const RATE = 1 // simulated minutes per second
 
 let origin = 0
 let startedAt = 0
 let downUntil = 0
+let building: Building | undefined
 const open = new Set<number>()
 
 const now = () => Math.min(DAY_MIN, origin + ((Date.now() - startedAt) / 1000) * RATE)
@@ -38,7 +41,7 @@ const hub = createHub((conn, m) => post(conn, 'message', JSON.stringify(m)))
 function startDay(at: number) {
   origin = at
   startedAt = Date.now()
-  hub.newDay(toEvents(simulate(SEED)), at)
+  hub.newDay(toEvents(building ? simulateClinic(building) : simulate(SEED)), at)
 }
 
 function tick() {
@@ -51,6 +54,7 @@ self.onmessage = (e: MessageEvent<Pipe>) => {
   const m = e.data
   switch (m.op) {
     case 'boot':
+      building = m.building
       if (!hub.day) startDay(m.start)
       break
     case 'outage':

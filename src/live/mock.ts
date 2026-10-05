@@ -1,3 +1,4 @@
+import type { Building } from '../data/building'
 import type { Transport } from './feed'
 
 /*
@@ -12,7 +13,7 @@ let server: Worker | undefined
 let count = 0
 const links = new Map<number, Parameters<Transport>[0]>()
 
-function worker(start: number) {
+function worker(start: number, building?: Building) {
   if (!server) {
     server = new Worker(new URL('./server.worker.ts', import.meta.url), { type: 'module' })
     server.onmessage = (e: MessageEvent<Pipe>) => {
@@ -25,17 +26,17 @@ function worker(start: number) {
         on.close()
       }
     }
-    server.postMessage({ op: 'boot', start })
+    server.postMessage({ op: 'boot', start, building })
   }
   return server
 }
 
-/** Connects to the mock server; the first connection starts its clock at simulated minute `start`. */
+/** Connects to the mock server; the first connection starts its clock at simulated minute `start`, on the hospital or the building given. */
 export const mockTransport =
-  (start: number): Transport =>
+  (start: number, building?: Building): Transport =>
   (on) => {
     const conn = ++count
-    const w = worker(start)
+    const w = worker(start, building)
     links.set(conn, on)
     w.postMessage({ op: 'open', conn })
     return {

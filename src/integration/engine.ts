@@ -1,10 +1,10 @@
-import { ROOM_BY_ID } from '../data/floorplan'
 import type { Alert, AssetKind, AssetStatus, BedState } from '../data/types'
 import type { Timed } from '../live/hub'
 import { ALERT_TITLE } from '../lib/alerts'
 import { LIMIT } from '../data/limits'
 import { STEP } from '../sim/time'
-import { ROOT, type BedStatus, type FlowRequest, type NurseCall, type Reading, type RoundPlan, type TagReport, type Telemetry } from './topics'
+import { HOSPITAL_SITE, type Site } from './sites'
+import type { BedStatus, FlowRequest, NurseCall, Reading, RoundPlan, TagReport, Telemetry } from './topics'
 
 /*
   The integration server's engine: the hospital's raw messages in
@@ -17,19 +17,21 @@ import { ROOT, type BedStatus, type FlowRequest, type NurseCall, type Reading, t
 
   Rules on readings run when a frame goes out; rules on time (a call light
   waiting, a bed left dirty or a clean one left empty) run on every clock
-  message, after everything up to that minute. A message that names no
-  known room, or carries no minute, is counted and dropped.
+  message, after everything up to that minute. An engine serves one site
+  (sites.ts): the hospital, or the clinic, which flags no turnover. A message
+  that names no room the site knows, or carries no minute, is counted and
+  dropped.
 */
 
 const STATES = new Set<BedState>(['occupied', 'dirty', 'cleaning', 'ready', 'blocked'])
 const KINDS = new Set<AssetKind>(['pump', 'vent', 'chair', 'xray', 'scanner'])
 const STATUSES = new Set<AssetStatus>(['in-use', 'available', 'needs-cleaning', 'charging'])
-const isRoom = (id: unknown): id is string => typeof id === 'string' && id in ROOM_BY_ID
 const isNumber = (n: unknown): n is number => typeof n === 'number' && Number.isFinite(n)
 
 type Opening = Omit<Alert, 'to' | 'title'>
 
-export function createEngine() {
+export function createEngine(site: Site = HOSPITAL_SITE) {
+  const isRoom = (id: unknown): id is string => typeof id === 'string' && site.rooms.has(id)
   const env = new Map<string, { temp: number; co2: number }>()
   const battery = new Map<string, number>()
   const beds = new Map<string, { state: BedState; acuity?: number; note?: string; since: number }>()
@@ -101,7 +103,7 @@ export function createEngine() {
       const from = pressed + LIMIT.call
       if (m >= from) out.push(...openAlert(`call:${key}`, { id: `call-${room}-${pressed}`, kind: 'call', from, since: pressed, severity: 'warning', target: { type: 'room', id: room } }))
     }
-    for (const [room, bed] of beds) {
+    for (const [room, bed] of site.turnover ? beds : []) {
       const target = { type: 'room', id: room } as const
       if (bed.state === 'dirty' && m >= bed.since + LIMIT.dirty) {
         out.push(...openAlert(`dirty:${room}`, { id: `dirty-${room}-${bed.since}`, kind: 'dirty', from: bed.since + LIMIT.dirty, since: bed.since, severity: 'warning', target }))
@@ -117,9 +119,9 @@ export function createEngine() {
   /** Takes one message and returns the events it makes, if any. */
   function ingest(t: string, payload: unknown): Timed[] {
     const p = payload as Record<string, unknown> | null
-    if (!p || !isNumber(p.at) || !t.startsWith(`${ROOT}/`)) return drop()
+    if (!p || !isNumber(p.at) || !t.startsWith(`${site.root}/`)) return drop()
     const at = p.at
-    const [system, part, id] = t.slice(ROOT.length + 1).split('/')
+    const [system, part, id] = t.slice(site.root.length + 1).split('/')
     switch (system) {
       case 'bms': {
         const r = p as unknown as Reading
@@ -179,7 +181,7 @@ export function createEngine() {
 
   return {
     ingest,
-    /** How many messages were dropped as malformed or about something the floor plan does not know. */
+    /** How many messages were dropped as malformed or about something the site does not know. */
     get dropped() {
       return dropped
     },

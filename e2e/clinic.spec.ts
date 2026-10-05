@@ -75,3 +75,16 @@ test('the clinic in Arabic: right to left, its floors by their Arabic names', as
   await expect(page.getByRole('radio', { name: 'الطابق الأرضي' })).toBeVisible()
   await expect(page).toHaveTitle('مقطع: عيادة من نموذج BIM الخاص بها')
 })
+
+test('live, the clinic builds itself from its own feed, an alert is acknowledged there, and replay comes back', async ({ page }) => {
+  await page.goto('/?building=clinic&mode=live')
+  await expect(page.locator('.feed')).toHaveAttribute('data-state', 'live')
+  await expect(page.locator('.board__cell')).toHaveCount(49)
+  const warm = page.locator('.panel .alert-item', { hasText: 'Room too warm' })
+  await warm.getByRole('button', { name: 'Acknowledge' }).click()
+  await expect(warm).toContainText('Acknowledged')
+  await expect(warm.getByRole('button', { name: 'Send to Facilities' })).toBeVisible()
+  await page.getByRole('radio', { name: 'Replay' }).click()
+  await expect(page.locator('.clock')).toHaveText('14:30')
+  await expect(page).not.toHaveURL(/mode=live/)
+})

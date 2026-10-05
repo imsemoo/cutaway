@@ -2,7 +2,7 @@ import { Component, Suspense, lazy, useEffect, type ReactNode } from 'react'
 import type { Day } from './data/types'
 import { ROOM_BY_ID } from './data/floorplan'
 import { say, useLang } from './i18n'
-import { assetLabel, bedAt, bedLabel, clock, roomName } from './lib/query'
+import { assetLabel, bedAt, bedLabel, roomName } from './lib/query'
 import { SEED } from './sim/simulate'
 import { useQuality } from './state/quality'
 import { covers, syncUrl, useWard } from './state/store'
@@ -10,7 +10,7 @@ import { Building } from './ui/Building'
 import { LayerDock, ViewTools } from './ui/LayerDock'
 import { Panel } from './ui/Panel'
 import { Tags } from './ui/Tags'
-import { Timeline } from './ui/Timeline'
+import { Stale, Timeline } from './ui/Timeline'
 import { TopBar } from './ui/TopBar'
 
 // The 3D bundle loads after the interface shell has painted; the table, only when someone opens the list view.
@@ -182,18 +182,6 @@ function useKeys() {
     window.addEventListener('keydown', onKey)
     return () => window.removeEventListener('keydown', onKey)
   }, [])
-}
-
-/** Live data that has stopped arriving must not pass for live, so the stage says so. The feed status announces it. */
-function Stale() {
-  const offline = useWard((s) => s.mode === 'live' && s.day !== null && s.feed.state !== 'live')
-  const t = useWard((s) => s.t)
-  if (!offline) return null
-  return (
-    <p className="stale" aria-hidden="true">
-      {say('No connection. Showing the floor as of')} <span className="num">{clock(t)}</span>
-    </p>
-  )
 }
 
 /** Tells screen readers what the 3D view just focused on. */

@@ -57,9 +57,10 @@ export function toEvents(day: Day): Stamped[] {
   return log.sort((a, b) => a.at - b.at).map((e, seq) => ({ ...e, seq }))
 }
 
-export function emptyDay(seed: number): Day {
+/** A day with nothing in it yet, for the hospital's rooms or, given them, another building's. */
+export function emptyDay(seed: number, ids: Iterable<string> = ROOMS.map((r) => r.id)): Day {
   const rooms: Record<string, RoomDay> = {}
-  for (const r of ROOMS) rooms[r.id] = { spans: [], temp: [], co2: [] }
+  for (const id of ids) rooms[id] = { spans: [], temp: [], co2: [] }
   return { seed, rooms, calls: [], assets: [], alerts: [], requests: [], plans: [], actions: [] }
 }
 

@@ -12,7 +12,8 @@ const MODES: { id: Mode; label: string; icon: typeof Play }[] = [
   { id: 'live', label: 'Live', icon: Radio },
 ]
 
-export function Timeline() {
+/** The play controls and the day's track. `every` marks every alert, for a building small enough to show them all, as the clinic is. */
+export function Timeline({ every = false }: { every?: boolean }) {
   const day = useWard((s) => s.day)
   const t = useWard((s) => s.t)
   const playing = useWard((s) => s.playing)
@@ -29,9 +30,9 @@ export function Timeline() {
   const marks = useMemo(() => {
     const on = new Set(scopeWings(scope).map((w) => w.code))
     return (day?.alerts ?? [])
-      .filter((a) => (scope === HOSPITAL ? a.severity === 'critical' : on.has(alertWing(a) ?? '')))
+      .filter((a) => every || (scope === HOSPITAL ? a.severity === 'critical' : on.has(alertWing(a) ?? '')))
       .map((a) => ({ id: a.id, at: a.from, color: SEVERITY[a.severity], title: `${clock(a.from)} ${alertTitle(a)} ${a.target.id}` }))
-  }, [day, scope])
+  }, [day, scope, every])
 
   // Playback controls keep time running left to right in either language, as media players do.
   return (
@@ -113,6 +114,18 @@ export function Timeline() {
         </div>
       </div>
     </footer>
+  )
+}
+
+/** Live data that has stopped arriving must not pass for live, so the stage says so. The feed status announces it. */
+export function Stale() {
+  const offline = useWard((s) => s.mode === 'live' && s.day !== null && s.feed.state !== 'live')
+  const t = useWard((s) => s.t)
+  if (!offline) return null
+  return (
+    <p className="stale" aria-hidden="true">
+      {say('No connection. Showing the floor as of')} <span className="num">{clock(t)}</span>
+    </p>
   )
 }
 

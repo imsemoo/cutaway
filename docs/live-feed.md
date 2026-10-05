@@ -1,6 +1,6 @@
 # The live feed
 
-Live mode builds the floor from a stream of events. In the demo the stream comes from a mock server in a Web Worker (`src/live/server.worker.ts`), which plays the simulated day at a simulated minute a second. In a hospital, a small integration server would stand in front of the admissions, building management, nurse call and location systems, and the page would reach it with `VITE_FEED_URL`.
+Live mode builds the floor from a stream of events. In the demo the stream comes from a mock server in a Web Worker (`src/live/server.worker.ts`), which plays the simulated day at a simulated minute a second. In a hospital, a small integration server would stand in front of the admissions, building management, nurse call and location systems, and the page would reach it with `VITE_FEED_URL`. The clinic (`?building=clinic&mode=live`) has a feed of its own, in the same protocol: the mock server playing the clinic's day, or the server at `VITE_CLINIC_FEED_URL`.
 
 The views never learn which one they read: the page folds events into the same `Day` the replay uses (`applyEvents` in `src/live/events.ts`).
 
@@ -9,7 +9,7 @@ The views never learn which one they read: the page folds events into the same `
 Text frames, one JSON object each, over any ordered connection. The page's side (`src/live/feed.ts`) needs a `Transport`: it opens a connection, sends text, closes it, and reports open, message and close.
 
 - `webSocketTransport(url)` connects to a real server.
-- `mockTransport(start)` in `src/live/mock.ts` reaches the worker. The first connection starts the mock server's clock at that minute.
+- `mockTransport(start, building?)` in `src/live/mock.ts` reaches the worker. The first connection starts the mock server's clock at that minute, on the hospital's day or, given the clinic, on the clinic's.
 
 ## Page to server
 

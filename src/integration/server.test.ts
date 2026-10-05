@@ -1,20 +1,24 @@
 /// <reference types="node" />
 import { once } from 'node:events'
+import { readFileSync } from 'node:fs'
 import net, { type AddressInfo } from 'node:net'
 import { Aedes } from 'aedes'
 import mqtt from 'mqtt'
 import { afterAll, beforeAll, describe, expect, it, vi } from 'vitest'
 import WebSocket from 'ws'
+import { CLINIC_SEED, simulateClinic } from '../clinic/simulate'
+import type { Building } from '../data/building'
 import { STORY, WING_BY_CODE } from '../data/floorplan'
 import type { Day } from '../data/types'
 import { applyEvents, emptyDay } from '../live/events'
 import { openFeed, type Feed, type Transport } from '../live/feed'
-import { activeAlerts, census } from '../lib/query'
+import { activeAlerts, bedAt, census } from '../lib/query'
 import { SEED, simulate } from '../sim/simulate'
 import { DEFAULT_TIME } from '../state/store'
 import { deviceMessages } from './devices'
 import { startFeedServer, type FeedServer } from './server'
-import { topic, type Dispatch } from './topics'
+import { clinicSite } from './sites'
+import { topic, topicsFor, type Dispatch } from './topics'
 
 /** The feed's transport over the ws package, which Node 20 needs. */
 const wsTransport =
@@ -86,6 +90,35 @@ describe('the integration server', () => {
       feed?.close()
       await devices.endAsync()
       await teams.endAsync()
+    }
+  }, 30_000)
+
+  it('serves the clinic as a site of its own, from its own topics, on a feed of its own', async () => {
+    const building: Building = JSON.parse(readFileSync('public/buildings/clinic.json', 'utf8'))
+    const site = clinicSite(building)
+    const recorded = simulateClinic(building)
+    const rooms = building.spaces.map((s) => s.id)
+    const clinic = await startFeedServer({ broker: url, port: 0, tickMs: 100, site })
+    const devices = await mqtt.connectAsync(url)
+    let feed: Feed | undefined
+    try {
+      for (const m of deviceMessages(recorded, topicsFor(site.root))) {
+        if (m.payload.at > DEFAULT_TIME) break
+        devices.publish(m.topic, JSON.stringify(m.payload))
+      }
+      let day: Day = emptyDay(CLINIC_SEED, rooms)
+      feed = openFeed(wsTransport(`ws://127.0.0.1:${clinic.port}`), { apply: (events, reset) => (day = applyEvents(reset ? emptyDay(CLINIC_SEED, rooms) : day, events)), status: () => {} }, (flush) => setTimeout(flush, 0))
+      const open = (d: Day) => activeAlerts(d, DEFAULT_TIME).map((a) => a.id).sort()
+      await vi.waitFor(() => expect(open(day)).toEqual(open(recorded)), { timeout: 20_000, interval: 100 })
+      const care = building.spaces.filter((s) => s.kind === 'care').map((s) => s.id)
+      const states = (d: Day) => care.map((id) => bedAt(d, id, DEFAULT_TIME)?.state)
+      expect(states(day)).toEqual(states(recorded))
+      // Nothing of the hospital reaches it.
+      expect(Object.keys(day.rooms)).toEqual(rooms)
+    } finally {
+      feed?.close()
+      await devices.endAsync()
+      await clinic.close()
     }
   }, 30_000)
 

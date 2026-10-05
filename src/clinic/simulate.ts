@@ -59,7 +59,8 @@ export function simulateClinic(building: Building, seed = CLINIC_SEED): Day {
       t = Math.min(DAY_MIN, ready + randInt(0, 25))
       list.push({ from: ready, to: t, state: 'ready' })
     }
-    if (t < DAY_MIN) list.push({ from: t, to: DAY_MIN, state: 'ready' })
+    // After its last turnover the room stays ready to midnight, as one span: a second would restart its "since".
+    list[list.length - 1].to = DAY_MIN
     spans[space.id] = list.filter((s) => s.to > s.from)
   }
   const inUse = (id: string, m: number) => spans[id]?.some((s) => s.state === 'occupied' && m >= s.from && m < s.to) ?? false

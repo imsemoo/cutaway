@@ -1,6 +1,6 @@
 import type { Day } from '../data/types'
 import { DAY_MIN, STEP } from '../sim/time'
-import { topic, type BedStatus, type Clock, type FlowRequest, type Message, type NurseCall, type Payload, type Reading, type RoundPlan, type TagReport, type Telemetry } from './topics'
+import { topic as hospital, type BedStatus, type Clock, type FlowRequest, type Message, type NurseCall, type Payload, type Reading, type RoundPlan, type TagReport, type Telemetry, type Topics } from './topics'
 
 /*
   The hospital's systems, simulated: the recorded day told as the raw
@@ -13,7 +13,7 @@ import { topic, type BedStatus, type Clock, type FlowRequest, type Message, type
 */
 
 /** Every state change of the day, in time order: beds, tags, call lights, bed requests and round plans. */
-function changes(day: Day): Message[] {
+function changes(day: Day, topic: Topics): Message[] {
   const out: Message[] = []
   const add = (t: string, payload: Payload) => {
     if (payload.at < DAY_MIN) out.push({ topic: t, payload })
@@ -37,9 +37,9 @@ function changes(day: Day): Message[] {
   return out.sort((a, b) => a.payload.at - b.payload.at)
 }
 
-/** The day's messages in the order the systems would send them, minute by minute. */
-export function* deviceMessages(day: Day): Generator<Message> {
-  const log = changes(day)
+/** The day's messages in the order the systems would send them, minute by minute, under a building's topics. */
+export function* deviceMessages(day: Day, topic: Topics = hospital): Generator<Message> {
+  const log = changes(day, topic)
   const pumps = day.assets.filter((a) => a.battery)
   const rooms = Object.entries(day.rooms)
   let i = 0

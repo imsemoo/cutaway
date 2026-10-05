@@ -132,6 +132,19 @@ The model: the Medical-Dental Clinic from buildingSMART's community samples, a r
 - The hospital stays as it is; the clinic is a second building beside it, labelled as a real plan with simulated data.
 - **Done when:** the clinic opens from a link, every layer and view works on it, and the first load and the hospital's numbers are unchanged.
 
+## Phase 7: the real building, live
+
+The clinic is a real plan, but its day is only replayed. The integration server (5.1) serves the hospital alone, and its rules know only the hospital's rooms.
+
+### 7.1 The clinic on the integration server
+- A building is a site for the server: its own topic root (`cutaway/clinic/...` beside the hospital's `cutaway/...`), the rooms it knows, the rules that apply to it, and a feed of its own. The clinic flags no turnover: an empty exam room is an ordinary thing in a clinic.
+- `npm run hospital` runs both buildings' systems on one broker, and a feed for each.
+- **Done when:** the clinic's whole day, told as raw device messages, comes out of the engine as exactly its recorded event log, every alert worked out by its rules, and a test runs its systems, the server and a screen end to end.
+
+### 7.2 Live mode in the clinic
+- The clinic page gets the Replay and Live switch: live, it folds the feed into its own rooms, from the demo's mock server or from the integration server (`VITE_CLINIC_FEED_URL`), with the same connection status, stale notice and alert actions as the hospital.
+- **Done when:** `?building=clinic&mode=live` builds the clinic from the feed, an alert can be acknowledged and sent there, and the hospital's first load stays within its budget.
+
 ## Status
 
 - [x] 1.1 Tests and CI: 23 unit tests, 8 browser tests at two sizes, lint, types and a bundle budget, all gating the deploy, green on GitHub.
@@ -151,3 +164,5 @@ The model: the Medical-Dental Clinic from buildingSMART's community samples, a r
 - [x] 5.1 An integration server, fed over MQTT: one topic per room, asset and flow (`src/integration/topics.ts`), a server that checks messages, works out every alert from raw data and serves the feed through the hub it shares with the mock; `npm run hospital` with `npm run dev:hospital`; the whole day as 1,005,153 device messages comes out as exactly the recording's 21,904 events with all 881 alerts; an end-to-end test with a broker, the server, a screen and a team; QoS 1 after QoS 0 lost most of a burst; decision 14
 - [x] 6.1 An IFC importer: `npm run ifc:import` reads the clinic's 13 MB IFC with web-ifc in Node and writes a 34 kB building file (gzipped): 259 rooms on two floors with their outlines, names, OmniClass kinds and stated areas, 1,297 wall footprints and 247 doors with the rooms they join; every room's area within 10 % of the model's own figure once the walls it is measured to are counted, all but one within 5 %; re-importing gives the committed file; the IFC stays out of the repository, docs/buildings.md says where to fetch it; decision 15
 - [x] 6.2 The clinic in the twin: `?building=clinic`, linked from the hospital's overviews, in 3D, plan and list, both floors side by side or one at a time, with the four layers, picking, tags, links, playback and Arabic; a simulated clinic day on its own rooms, its alerts by the hospital's rules; the hospital's first load went from 90.9 kB to 89.7 kB, as a room's details now load after the first paint, and the clinic adds 11.5 kB and its 34 kB plan
+- [x] 7.1 The clinic on the integration server: a building is a site with its own topic root (`cutaway/clinic/...`), rooms and rules, and a server serves one; `npm run hospital` runs a feed for each on one broker; the clinic's whole day as 78,452 device messages comes out as exactly its recorded 2,730 events with its 11 alerts, none for turnover; an end-to-end test serves it on its own feed; decision 16
+- [x] 7.2 Live mode in the clinic: the Replay and Live switch on the hospital's own timeline, the feed folded into the clinic's rooms from the mock server or `VITE_CLINIC_FEED_URL`, the connection status, the stale notice and alert actions; checked against the integration server and in a browser test; the hospital's first load unchanged at 89.7 kB

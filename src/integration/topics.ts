@@ -19,6 +19,10 @@ import type { AssetKind, AssetStatus, BedState, Team } from '../data/types'
   And one the server publishes, for the teams' own systems:
 
   cutaway/dispatch/<team>         an alert an operator sent to that team
+
+  Each building publishes under a root of its own: the hospital's is
+  cutaway, the clinic's cutaway/clinic, so cutaway/clinic/bms/<room> and so
+  on (sites.ts).
 */
 
 export const ROOT = 'cutaway'
@@ -79,17 +83,22 @@ export interface Dispatch {
   by?: string
 }
 
-export const topic = {
-  bms: (room: string) => `${ROOT}/bms/${room}`,
-  beds: (room: string) => `${ROOT}/beds/${room}`,
-  nursecall: (room: string) => `${ROOT}/nursecall/${room}`,
-  rtls: (asset: string) => `${ROOT}/rtls/${asset}`,
-  telemetry: (asset: string) => `${ROOT}/telemetry/${asset}`,
-  request: (id: string) => `${ROOT}/flow/request/${id}`,
-  plan: (room: string) => `${ROOT}/flow/plan/${room}`,
-  clock: `${ROOT}/clock`,
-  dispatch: (team: Team) => `${ROOT}/dispatch/${team}`,
-}
+/** The topics under a building's root. */
+export const topicsFor = (root: string) => ({
+  bms: (room: string) => `${root}/bms/${room}`,
+  beds: (room: string) => `${root}/beds/${room}`,
+  nursecall: (room: string) => `${root}/nursecall/${room}`,
+  rtls: (asset: string) => `${root}/rtls/${asset}`,
+  telemetry: (asset: string) => `${root}/telemetry/${asset}`,
+  request: (id: string) => `${root}/flow/request/${id}`,
+  plan: (room: string) => `${root}/flow/plan/${room}`,
+  clock: `${root}/clock`,
+  dispatch: (team: Team) => `${root}/dispatch/${team}`,
+})
+export type Topics = ReturnType<typeof topicsFor>
+
+/** The hospital's topics. */
+export const topic = topicsFor(ROOT)
 
 export type Payload = Reading | BedStatus | NurseCall | TagReport | Telemetry | FlowRequest | RoundPlan | Clock
 

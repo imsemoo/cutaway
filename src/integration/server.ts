@@ -7,7 +7,8 @@ import type { AlertAction, Team } from '../data/types'
 import { createHub } from '../live/hub'
 import type { ClientMessage } from '../live/protocol'
 import { createEngine } from './engine'
-import { ROOT, topic, type Dispatch } from './topics'
+import { HOSPITAL_SITE, type Site } from './sites'
+import { topicsFor, type Dispatch } from './topics'
 
 /*
   The integration server. It subscribes to the hospital's topics on an MQTT
@@ -18,12 +19,13 @@ import { ROOT, topic, type Dispatch } from './topics'
   when it sends an alert to a team, published on MQTT for that team's own
   system.
 
-  The clock comes from the clock topic; when it goes back, a new day has
-  begun and every screen starts over. The server does no authentication of
+  It serves one building, a site (sites.ts): the hospital unless told
+  otherwise. The clock comes from the site's clock topic; when it goes back,
+  a new day has begun and every screen starts over. The server does no authentication of
   its own: a deployment puts it behind the hospital's gateway.
 */
 
-const INBOUND = ['bms/+', 'beds/+', 'nursecall/+', 'rtls/+', 'telemetry/+', 'flow/request/+', 'flow/plan/+', 'clock'].map((t) => `${ROOT}/${t}`)
+const INBOUND = ['bms/+', 'beds/+', 'nursecall/+', 'rtls/+', 'telemetry/+', 'flow/request/+', 'flow/plan/+', 'clock']
 const TEAMS = new Set<Team>(['nursing', 'housekeeping', 'facilities', 'bed-management'])
 
 /** A screen's message, checked field by field and rebuilt, so nothing else it carried reaches the log or the other screens. */
@@ -59,18 +61,21 @@ export async function startFeedServer({
   broker,
   port = 8787,
   tickMs = 1000,
+  site = HOSPITAL_SITE,
   report,
 }: {
   broker: string
   port?: number
   tickMs?: number
+  site?: Site
   /** Where to say, every ten seconds, what has come in and gone out. */
   report?: (line: string) => void
 }): Promise<FeedServer> {
-  const mq = await mqtt.connectAsync(broker, { clientId: `cutaway-feed-${process.pid}-${Date.now()}` })
+  const topic = topicsFor(site.root)
+  const mq = await mqtt.connectAsync(broker, { clientId: `cutaway-feed-${site.name}-${process.pid}-${Date.now()}` })
   const sockets = new Map<number, WebSocket>()
   const hub = createHub((conn, m) => sockets.get(conn)?.send(JSON.stringify(m)))
-  let engine = createEngine()
+  let engine = createEngine(site)
   let clock = 0
   let received = 0
   let logged = 0
@@ -87,7 +92,7 @@ export async function startFeedServer({
       const at = (payload as { at?: unknown } | null)?.at
       if (typeof at === 'number') {
         if (at < clock) {
-          engine = createEngine()
+          engine = createEngine(site)
           hub.newDay([], at)
         }
         clock = at
@@ -99,7 +104,10 @@ export async function startFeedServer({
     if (events.length) hub.append(events, clock)
   })
   // At QoS 1, so a burst is delivered rather than thinned.
-  await mq.subscribeAsync(INBOUND, { qos: 1 })
+  await mq.subscribeAsync(
+    INBOUND.map((t) => `${site.root}/${t}`),
+    { qos: 1 },
+  )
 
   const wss = new WebSocketServer({ port, maxPayload: 16 * 1024 })
   await once(wss, 'listening')
